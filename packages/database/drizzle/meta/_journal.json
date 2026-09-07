@@ -8,6 +8,13 @@
       "when": 1788747938485,
       "tag": "0000_eager_reptil",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788819960167,
+      "tag": "0001_wooden_mole_man",
+      "breakpoints": true
     }
   ]
 }

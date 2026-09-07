@@ -1,6 +1,7 @@
 import {
   customType,
   doublePrecision,
+  boolean,
   index,
   integer,
   jsonb,
@@ -51,11 +52,68 @@ export const users = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     email: text('email').notNull(),
-    name: text('name'),
+    name: text('name').default('').notNull(),
+    emailVerified: boolean('email_verified').default(false).notNull(),
+    image: text('image'),
     createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
     updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
   },
   (table) => [uniqueIndex('users_email_unique').on(table.email)],
+);
+
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(),
+    expiresAt: timestampWithTimezone('expires_at').notNull(),
+    token: text('token').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('sessions_token_unique').on(table.token),
+    index('sessions_user_id_idx').on(table.userId),
+  ],
+);
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: timestampWithTimezone('access_token_expires_at'),
+    refreshTokenExpiresAt: timestampWithTimezone('refresh_token_expires_at'),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [index('accounts_user_id_idx').on(table.userId)],
+);
+
+export const verifications = pgTable(
+  'verifications',
+  {
+    id: text('id').primaryKey(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestampWithTimezone('expires_at').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [index('verifications_identifier_idx').on(table.identifier)],
 );
 
 export const organizations = pgTable(

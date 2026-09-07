@@ -1,5 +1,6 @@
 import type {
   apiKeys,
+  accounts,
   auditLogs,
   billingEvents,
   emotionalEvents,
@@ -13,13 +14,18 @@ import type {
   organizationMembers,
   organizations,
   projects,
+  sessions,
   subscriptions,
   usageRecords,
   users,
+  verifications,
 } from './tables';
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type AuthSession = typeof sessions.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type Verification = typeof verifications.$inferSelect;
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type OrganizationMember = typeof organizationMembers.$inferSelect;

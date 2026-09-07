@@ -3,11 +3,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**"],
+      "env": ["DATABASE_URL", "AUTH_SECRET", "BETTER_AUTH_URL"]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["DATABASE_URL", "AUTH_SECRET", "BETTER_AUTH_URL"]
     },
     "lint": {
       "dependsOn": ["^lint"]
