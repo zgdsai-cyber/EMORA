@@ -1,8 +1,43 @@
 import { InvalidDomainObjectError } from '../errors/emotional-core-error';
+import type { EmotionName } from './emotion-vector';
+
+export interface EmotionCoefficient {
+  readonly positive: number;
+  readonly negative: number;
+  readonly uncertainty: number;
+  readonly relevance: number;
+  readonly surprise: number;
+}
+
+export interface TrustEmotionCoefficient {
+  readonly positive: number;
+  readonly relevance: number;
+  readonly surprise: number;
+}
+
+export type EmotionWeights = Readonly<{
+  readonly trust: TrustEmotionCoefficient;
+} & {
+  readonly [Emotion in Exclude<EmotionName, 'trust'>]: EmotionCoefficient;
+}>;
+
+export interface DynamicsParameterSet {
+  readonly eventImpactWeights: Readonly<{ surpriseBase: number; surpriseScale: number }>;
+  readonly personalityWeights: Readonly<Record<string, number>>;
+  readonly emotionWeights: EmotionWeights;
+  readonly interactionWeights: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  readonly memoryWeights: Readonly<Record<string, number>>;
+  readonly stabilityWeights: Readonly<{
+    rate: number;
+    baseline: Readonly<Record<string, number>>;
+  }>;
+  readonly confidenceWeights: Readonly<Record<string, number>>;
+}
 
 export interface ModelParameters {
   readonly sets: Readonly<Record<string, Readonly<Record<string, number>>>>;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly dynamics?: DynamicsParameterSet;
 }
 
 export function createModelParameters(input: ModelParameters): ModelParameters {
@@ -24,6 +59,7 @@ export function createModelParameters(input: ModelParameters): ModelParameters {
   );
   return Object.freeze({
     sets: Object.freeze(sets),
+    dynamics: input.dynamics,
     metadata: input.metadata ? Object.freeze({ ...input.metadata }) : undefined,
   });
 }
