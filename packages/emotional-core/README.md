@@ -1,5 +1,9 @@
 # Emotional Core
 
-Pure TypeScript domain contracts for modeling estimated emotional states. This package has no dependencies on frameworks, persistence, transport, UI, browser APIs, or infrastructure.
+Pure, deterministic TypeScript contracts and mathematical utilities for
+estimated emotional states. The package has no framework, persistence, network,
+authentication, browser, or machine-learning dependencies.
 
-Normalized scalar dimensions are intended to use the inclusive range `0..1`; valence may be mapped to `-1..1` in a future model revision and must be specified by that revision. No equations or prediction behavior are implemented in Phase 1.
+Invalid numeric input throws a domain error. Validation never silently clamps;
+use the explicit clamp helpers when clamping is desired. See
+`docs/emotional-model.md` for the domain and temporal architecture.
