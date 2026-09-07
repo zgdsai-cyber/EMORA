@@ -1,10 +1,10 @@
-import { cloneEmotionalState } from '../domain/emotional-state';
 import type { EmotionalState } from '../domain/emotional-state';
 import type { ModelVersion } from '../domain/model-version';
 import type { StateTransitionInput } from '../transition/transition-types';
 import { InvalidDomainObjectError } from '../errors/emotional-core-error';
 import { validateEmotionalState } from '../domain/emotional-state';
 import { validateNormalized01 } from '../math/ranges';
+import { deepCloneAndFreeze } from '../utils/deep-immutable';
 
 export interface MLEmotionalStatePrediction {
   readonly state: EmotionalState;
@@ -37,15 +37,8 @@ export function createMLPrediction(
   validateMLPrediction(input);
   return Object.freeze({
     ...input,
-    state: cloneEmotionalState(input.state),
-    metadata: input.metadata ? Object.freeze({ ...input.metadata }) : undefined,
-    modelVersion: input.modelVersion
-      ? Object.freeze({
-          ...input.modelVersion,
-          metadata: input.modelVersion.metadata
-            ? Object.freeze({ ...input.modelVersion.metadata })
-            : undefined,
-        })
-      : undefined,
+    state: deepCloneAndFreeze(input.state),
+    metadata: input.metadata ? deepCloneAndFreeze(input.metadata) : undefined,
+    modelVersion: input.modelVersion ? deepCloneAndFreeze(input.modelVersion) : undefined,
   });
 }

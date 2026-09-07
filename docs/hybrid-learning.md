@@ -29,18 +29,43 @@ hybrid = \alpha \times deterministic + (1 - \alpha) \times ML
 $$
 
 The same weighted equation is applied independently to every emotion-vector
-component and to all four continuous state dimensions. The result also exposes
-a separate fused prediction confidence, calculated from the deterministic
-state's confidence dimension and the ML prediction's explicit confidence. All
-fused values are clamped to their declared ranges and returned as immutable
-domain objects.
+component and to all four continuous state dimensions for intermediate values
+of $\alpha$. The numeric endpoints are explicit: $\alpha=1$ selects every
+numeric value from the deterministic state, while $\alpha=0$ selects every
+numeric value from the ML state. This avoids relying on floating-point
+interpolation for endpoint identity.
 
-- $\alpha = 1$: fully deterministic output.
-- $\alpha = 0$: fully ML state output; confidence comes from the ML prediction.
+The result also exposes a separate fused prediction confidence, calculated from
+the deterministic state's confidence dimension and the ML prediction's
+explicit confidence. All fused values are clamped to their declared ranges and
+returned as immutable domain objects.
+
+- $\alpha = 1$: fully deterministic numeric state and deterministic prediction confidence.
+- $\alpha = 0$: fully ML numeric state and ML prediction confidence.
 - $0 < \alpha < 1$: weighted hybrid output.
 
-The fused metadata records the ML model identifier/version and marks the state
-as a hybrid result. No internal mutable references are exposed.
+Metadata has one explicit source-selection policy for both `state.metadata` and
+the top-level prediction `metadata`. At $\alpha=1$, the state metadata and the
+top-level metadata contain only deterministic state metadata. At $\alpha=0$,
+the state metadata contains only ML state metadata and the top-level metadata
+contains only ML prediction metadata. Neither endpoint includes metadata from
+the non-selected source or hybrid provenance. For intermediate values, state
+metadata is `{ deterministic: deterministic state metadata, ml: ML state
+metadata, fusion: { alpha } }`, while top-level metadata uses the same wrapper
+with ML prediction metadata in its `ml` field. This preserves each legitimate
+source metadata at its owning API level without overwriting ambiguous keys.
+
+The deterministic timestamp is the canonical timestamp for intermediate fusion.
+At either endpoint, the selected source timestamp is returned exactly. At
+intermediate values, the deterministic model version is preferred when present;
+otherwise the ML model version is used. At either endpoint, the selected source
+model version is returned exactly.
+
+ML predictions and hybrid outputs use an internal deep-copy/deep-freeze utility
+for primitives, `null`, `undefined`, arrays, and nested plain objects. Unsupported
+values such as `Date`, `Map`, `Set`, class instances, and functions are rejected
+with a runtime error rather than silently converted to `{}`. No internal mutable
+references are exposed through the returned prediction boundary.
 
 ## Extension path
 
