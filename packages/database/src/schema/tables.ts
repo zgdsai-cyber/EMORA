@@ -1,0 +1,418 @@
+import {
+  customType,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+const timestampWithTimezone = (name: string) =>
+  timestamp(name, { withTimezone: true, mode: 'date' });
+
+type JsonObject = Record<string, unknown>;
+
+export const organizationRole = pgEnum('organization_role', [
+  'OWNER',
+  'ADMIN',
+  'MEMBER',
+  'VIEWER',
+]);
+
+export const feedbackType = pgEnum('feedback_type', [
+  'SELF_REPORTED_EMOTION',
+  'OBSERVED_BEHAVIOR',
+  'MODEL_PREDICTION',
+  'HUMAN_ANNOTATION',
+]);
+
+export const embedding = customType<{
+  data: readonly number[];
+  driverData: string;
+}>({
+  dataType() {
+    return 'vector(1536)';
+  },
+  toDriver(value) {
+    return `[${value.join(',')}]`;
+  },
+  fromDriver(value) {
+    return value.slice(1, -1).split(',').filter(Boolean).map(Number);
+  },
+});
+
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: text('email').notNull(),
+    name: text('name'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('users_email_unique').on(table.email)],
+);
+
+export const organizations = pgTable(
+  'organizations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('organizations_slug_unique').on(table.slug)],
+);
+
+export const organizationMembers = pgTable(
+  'organization_members',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    role: organizationRole('role').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('organization_members_organization_user_unique').on(
+      table.organizationId,
+      table.userId,
+    ),
+    index('organization_members_organization_id_idx').on(table.organizationId),
+    index('organization_members_user_id_idx').on(table.userId),
+  ],
+);
+export const projects = pgTable(
+  'projects',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('projects_organization_slug_unique').on(
+      table.organizationId,
+      table.slug,
+    ),
+    index('projects_organization_id_idx').on(table.organizationId),
+  ],
+);
+
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    name: text('name').notNull(),
+    keyPrefix: text('key_prefix').notNull(),
+    keyHash: text('key_hash').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    lastUsedAt: timestampWithTimezone('last_used_at'),
+    revokedAt: timestampWithTimezone('revoked_at'),
+  },
+  (table) => [
+    uniqueIndex('api_keys_key_hash_unique').on(table.keyHash),
+    index('api_keys_project_id_idx').on(table.projectId),
+  ],
+);
+
+export const emotionalProfiles = pgTable(
+  'emotional_profiles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    externalReference: text('external_reference').notNull(),
+    profileData: jsonb('profile_data').$type<JsonObject>().notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('emotional_profiles_project_external_reference_unique').on(
+      table.projectId,
+      table.externalReference,
+    ),
+    index('emotional_profiles_project_id_idx').on(table.projectId),
+  ],
+);
+
+export const emotionalEvents = pgTable(
+  'emotional_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => emotionalProfiles.id),
+    timestamp: timestampWithTimezone('timestamp').notNull(),
+    source: text('source').notNull(),
+    valence: doublePrecision('valence'),
+    intensity: doublePrecision('intensity'),
+    relevance: doublePrecision('relevance'),
+    surprise: doublePrecision('surprise'),
+    uncertainty: doublePrecision('uncertainty'),
+    context: jsonb('context').$type<JsonObject>(),
+    metadata: jsonb('metadata').$type<JsonObject>(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('emotional_events_project_id_idx').on(table.projectId),
+    index('emotional_events_profile_id_idx').on(table.profileId),
+    index('emotional_events_timestamp_idx').on(table.timestamp),
+  ],
+);
+
+export const modelVersions = pgTable(
+  'model_versions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    version: text('version').notNull(),
+    datasetVersion: text('dataset_version'),
+    parameterSet: jsonb('parameter_set').$type<JsonObject>(),
+    status: text('status').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('model_versions_name_version_unique').on(
+      table.name,
+      table.version,
+    ),
+  ],
+);
+
+export const emotionalStates = pgTable(
+  'emotional_states',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => emotionalProfiles.id),
+    timestamp: timestampWithTimezone('timestamp').notNull(),
+    state: jsonb('state').$type<JsonObject>().notNull(),
+    valence: doublePrecision('valence'),
+    arousal: doublePrecision('arousal'),
+    intensity: doublePrecision('intensity'),
+    confidence: doublePrecision('confidence'),
+    modelVersionId: uuid('model_version_id')
+      .notNull()
+      .references(() => modelVersions.id),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('emotional_states_project_id_idx').on(table.projectId),
+    index('emotional_states_profile_id_idx').on(table.profileId),
+    index('emotional_states_timestamp_idx').on(table.timestamp),
+  ],
+);
+
+export const emotionalMemories = pgTable(
+  'emotional_memories',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => emotionalProfiles.id),
+    content: text('content').notNull(),
+    reference: text('reference'),
+    timestamp: timestampWithTimezone('timestamp').notNull(),
+    emotionState: jsonb('emotion_state').$type<JsonObject>(),
+    intensity: doublePrecision('intensity'),
+    importance: doublePrecision('importance'),
+    decayRate: doublePrecision('decay_rate'),
+    embedding: embedding('embedding'),
+    metadata: jsonb('metadata').$type<JsonObject>(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('emotional_memories_project_id_idx').on(table.projectId),
+    index('emotional_memories_profile_id_idx').on(table.profileId),
+    index('emotional_memories_timestamp_idx').on(table.timestamp),
+  ],
+);
+
+export const emotionPredictions = pgTable(
+  'emotion_predictions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => emotionalProfiles.id),
+    eventId: uuid('event_id').references(() => emotionalEvents.id),
+    modelVersionId: uuid('model_version_id')
+      .notNull()
+      .references(() => modelVersions.id),
+    prediction: jsonb('prediction').$type<JsonObject>().notNull(),
+    confidence: doublePrecision('confidence'),
+    uncertainty: doublePrecision('uncertainty'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('emotion_predictions_project_id_idx').on(table.projectId),
+    index('emotion_predictions_profile_id_idx').on(table.profileId),
+  ],
+);
+
+export const emotionFeedback = pgTable(
+  'emotion_feedback',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => emotionalProfiles.id),
+    predictionId: uuid('prediction_id')
+      .notNull()
+      .references(() => emotionPredictions.id),
+    feedbackType: feedbackType('feedback_type').notNull(),
+    value: jsonb('value').$type<JsonObject>().notNull(),
+    source: text('source').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('emotion_feedback_prediction_id_idx').on(table.predictionId),
+  ],
+);
+
+export const modelParameters = pgTable(
+  'model_parameters',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    modelVersionId: uuid('model_version_id')
+      .notNull()
+      .references(() => modelVersions.id),
+    name: text('name').notNull(),
+    parameters: jsonb('parameters').$type<JsonObject>().notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('model_parameters_model_version_name_unique').on(
+      table.modelVersionId,
+      table.name,
+    ),
+  ],
+);
+
+export const usageRecords = pgTable(
+  'usage_records',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id),
+    apiKeyId: uuid('api_key_id').references(() => apiKeys.id),
+    endpoint: text('endpoint').notNull(),
+    model: text('model'),
+    tokens: integer('tokens'),
+    processingTime: integer('processing_time'),
+    estimatedCost: doublePrecision('estimated_cost'),
+    timestamp: timestampWithTimezone('timestamp').notNull(),
+  },
+  (table) => [
+    index('usage_records_organization_id_idx').on(table.organizationId),
+    index('usage_records_project_id_idx').on(table.projectId),
+    index('usage_records_timestamp_idx').on(table.timestamp),
+  ],
+);
+
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    provider: text('provider').notNull(),
+    externalSubscriptionId: text('external_subscription_id').notNull(),
+    status: text('status').notNull(),
+    plan: text('plan').notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    updatedAt: timestampWithTimezone('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('subscriptions_provider_external_id_unique').on(
+      table.provider,
+      table.externalSubscriptionId,
+    ),
+    index('subscriptions_organization_id_idx').on(table.organizationId),
+  ],
+);
+
+export const billingEvents = pgTable(
+  'billing_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    provider: text('provider').notNull(),
+    externalEventId: text('external_event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').$type<JsonObject>().notNull(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_events_provider_external_id_unique').on(
+      table.provider,
+      table.externalEventId,
+    ),
+    index('billing_events_organization_id_idx').on(table.organizationId),
+  ],
+);
+
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    userId: uuid('user_id').references(() => users.id),
+    action: text('action').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: uuid('resource_id'),
+    metadata: jsonb('metadata').$type<JsonObject>(),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('audit_logs_organization_id_idx').on(table.organizationId),
+    index('audit_logs_created_at_idx').on(table.createdAt),
+  ],
+);

@@ -1,0 +1,6 @@
+{
+  "name": "@emora/auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reserved for Better Auth integration in a later phase."
+}

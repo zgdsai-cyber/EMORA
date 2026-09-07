@@ -1,0 +1,6 @@
+{
+  "name": "@emora/types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reserved for cross-package transport and platform types."
+}

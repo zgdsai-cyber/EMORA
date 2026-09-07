@@ -1,0 +1,6 @@
+{
+  "name": "@emora/ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Boundary for future provider adapters and hybrid prediction orchestration."
+}
