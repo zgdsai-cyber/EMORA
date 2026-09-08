@@ -25,6 +25,7 @@ export * from './dynamics/temporal-stability';
 export * from './dynamics/continuous-dimensions';
 export * from './dynamics/calculate-next-state';
 export * from './parameters/model-parameters';
+export * from './parameters/learnable-parameters';
 export * from './providers/deterministic-emotional-dynamics-provider';
 export * from './learning/ml-provider';
 export * from './learning/hybrid-fusion';
