@@ -14,10 +14,13 @@ import {
   createEventSource,
   createPersonalityProfile,
   DeterministicEmotionalDynamicsProvider,
+  emotionNames,
   extractEventFeatures,
+  InvalidDomainObjectError,
   validateModelParameters,
 } from '../index';
 import type { EmotionalMemory } from '../index';
+import type { EmotionInteractionMatrix } from '../index';
 import type { ModelParameters } from '../index';
 
 const profile = createPersonalityProfile({
@@ -35,46 +38,94 @@ const state = createEmotionalState({
   timestamp: '2026-01-01T00:00:00.000Z',
 });
 const positiveEvent = {
-  id: 'event-positive', timestamp: '2026-01-02T00:00:00.000Z', source: createEventSource('test'),
-  valence: 0.9, intensity: 1, relevance: 1, surprise: 0.5, uncertainty: 0.1,
+  id: 'event-positive',
+  timestamp: '2026-01-02T00:00:00.000Z',
+  source: createEventSource('test'),
+  valence: 0.9,
+  intensity: 1,
+  relevance: 1,
+  surprise: 0.5,
+  uncertainty: 0.1,
 } as const;
-const negativeEvent = { ...positiveEvent, id: 'event-negative', valence: -0.9, uncertainty: 0.8 } as const;
+const negativeEvent = {
+  ...positiveEvent,
+  id: 'event-negative',
+  valence: -0.9,
+  uncertainty: 0.8,
+} as const;
 
-function transition(event: typeof positiveEvent | typeof negativeEvent = positiveEvent, memories: readonly EmotionalMemory[] = []) {
-  return calculateNextEmotionalState({ currentState: state, event, personalityProfile: profile, memories });
+function transition(
+  event: typeof positiveEvent | typeof negativeEvent = positiveEvent,
+  memories: readonly EmotionalMemory[] = [],
+  modelParameters?: ModelParameters,
+) {
+  return calculateNextEmotionalState({
+    currentState: state,
+    event,
+    personalityProfile: profile,
+    memories,
+    modelParameters,
+  });
+}
+
+function parametersWithInteractionWeights(interactionWeights: unknown): ModelParameters {
+  const defaults = createDefaultModelParameters();
+  return {
+    ...defaults,
+    dynamics: {
+      ...defaults.dynamics,
+      interactionWeights: interactionWeights as EmotionInteractionMatrix,
+    },
+  } as unknown as ModelParameters;
 }
 
 describe('deterministic emotional dynamics', () => {
   it('extracts features and applies the documented impact formula', () => {
     expect(extractEventFeatures(positiveEvent).valence).toBe(0.9);
     expect(calculateEventImpact(positiveEvent)).toBeCloseTo(0.75);
-    expect(calculateBaseEmotionInfluence(extractEventFeatures(positiveEvent), 0.75).joy).toBeGreaterThan(0);
-    expect(calculateBaseEmotionInfluence(extractEventFeatures(negativeEvent), 0.75).fear).toBeGreaterThan(0);
+    expect(
+      calculateBaseEmotionInfluence(extractEventFeatures(positiveEvent), 0.75)
+        .joy,
+    ).toBeGreaterThan(0);
+    expect(
+      calculateBaseEmotionInfluence(extractEventFeatures(negativeEvent), 0.75)
+        .fear,
+    ).toBeGreaterThan(0);
   });
 
   it('is deterministic and returns explainability metadata', () => {
     const first = transition();
     const second = transition();
     expect(first).toEqual(second);
-    expect(first.explanationMetadata).toEqual(expect.objectContaining({
-      eventImpact: expect.any(Number),
-      personalityModifiers: expect.any(Object),
-      baseInfluence: expect.any(Object),
-      interactionInfluence: expect.any(Object),
-      memoryInfluence: expect.any(Object),
-      stabilityInfluence: expect.any(Object),
-      confidenceFactors: expect.any(Object),
-    }));
+    expect(first.explanationMetadata).toEqual(
+      expect.objectContaining({
+        eventImpact: expect.any(Number),
+        personalityModifiers: expect.any(Object),
+        baseInfluence: expect.any(Object),
+        interactionInfluence: expect.any(Object),
+        memoryInfluence: expect.any(Object),
+        stabilityInfluence: expect.any(Object),
+        confidenceFactors: expect.any(Object),
+      }),
+    );
   });
 
   it('responds directionally to positive, negative, and uncertain events', () => {
     const positive = transition(positiveEvent).nextState;
     const negative = transition(negativeEvent).nextState;
     expect(positive.emotionVector.joy).toBeGreaterThan(state.emotionVector.joy);
-    expect(positive.emotionVector.trust).toBeGreaterThan(state.emotionVector.trust);
-    expect(negative.emotionVector.fear).toBeGreaterThan(state.emotionVector.fear);
-    expect(negative.emotionVector.jealousy).toBeGreaterThan(state.emotionVector.jealousy);
-    expect(negative.emotionVector.trust).toBeLessThanOrEqual(state.emotionVector.trust);
+    expect(positive.emotionVector.trust).toBeGreaterThan(
+      state.emotionVector.trust,
+    );
+    expect(negative.emotionVector.fear).toBeGreaterThan(
+      state.emotionVector.fear,
+    );
+    expect(negative.emotionVector.jealousy).toBeGreaterThan(
+      state.emotionVector.jealousy,
+    );
+    expect(negative.emotionVector.trust).toBeLessThanOrEqual(
+      state.emotionVector.trust,
+    );
   });
 
   it('applies personality, interactions, memory, and temporal stability', () => {
@@ -94,12 +145,25 @@ describe('deterministic emotional dynamics', () => {
       event: positiveEvent,
       personalityProfile: lowSensitivity,
     });
-    expect(sensitive.nextState.emotionVector.joy).toBeGreaterThan(low.nextState.emotionVector.joy);
-    expect(applyEmotionInteractions(createEmotionVector({ fear: 1 })).trust).toBeLessThan(0);
-    expect(calculateMemoryStrength({
-      id: 'memory', timestamp: '2026-01-01T23:00:00.000Z', emotionalState: state,
-      intensity: 1, importance: 1, decayRate: 0,
-    }, positiveEvent.timestamp)).toBe(1);
+    expect(sensitive.nextState.emotionVector.joy).toBeGreaterThan(
+      low.nextState.emotionVector.joy,
+    );
+    expect(
+      applyEmotionInteractions(createEmotionVector({ fear: 1 })).trust,
+    ).toBeLessThan(0);
+    expect(
+      calculateMemoryStrength(
+        {
+          id: 'memory',
+          timestamp: '2026-01-01T23:00:00.000Z',
+          emotionalState: state,
+          intensity: 1,
+          importance: 1,
+          decayRate: 0,
+        },
+        positiveEvent.timestamp,
+      ),
+    ).toBe(1);
     const recentMemory: EmotionalMemory = {
       id: 'recent',
       timestamp: '2026-01-01T23:00:00.000Z',
@@ -118,25 +182,65 @@ describe('deterministic emotional dynamics', () => {
       timestamp: '2025-01-01T00:00:00.000Z',
       decayRate: 1,
     };
-    expect(calculateMemoryInfluence([recentMemory], state.emotionVector, positiveEvent.timestamp).joy).toBeGreaterThan(0);
-    expect(calculateMemoryInfluence([oldMemory], state.emotionVector, positiveEvent.timestamp).joy).toBeCloseTo(0);
-    expect(applyTemporalStability(createEmotionVector({ joy: 1 }), createEmotionVector(), createDefaultModelParameters()).joy).toBeLessThan(1);
+    expect(
+      calculateMemoryInfluence(
+        [recentMemory],
+        state.emotionVector,
+        positiveEvent.timestamp,
+      ).joy,
+    ).toBeGreaterThan(0);
+    expect(
+      calculateMemoryInfluence(
+        [oldMemory],
+        state.emotionVector,
+        positiveEvent.timestamp,
+      ).joy,
+    ).toBeCloseTo(0);
+    expect(
+      applyTemporalStability(
+        createEmotionVector({ joy: 1 }),
+        createEmotionVector(),
+        createDefaultModelParameters(),
+      ).joy,
+    ).toBeLessThan(1);
   });
 
   it('ignores future memories and rejects invalid parameter values', () => {
-    expect(calculateMemoryStrength({
-      id: 'future', timestamp: '2026-01-03T00:00:00.000Z', emotionalState: state,
-      intensity: 1, importance: 1, decayRate: 0,
-    }, positiveEvent.timestamp)).toBe(0);
-    expect(() => validateModelParameters({
-      sets: {}, dynamics: { ...createDefaultModelParameters().dynamics, confidenceWeights: { ...createDefaultModelParameters().dynamics.confidenceWeights, base: Number.NaN } },
-    })).toThrow();
+    expect(
+      calculateMemoryStrength(
+        {
+          id: 'future',
+          timestamp: '2026-01-03T00:00:00.000Z',
+          emotionalState: state,
+          intensity: 1,
+          importance: 1,
+          decayRate: 0,
+        },
+        positiveEvent.timestamp,
+      ),
+    ).toBe(0);
+    expect(() =>
+      validateModelParameters({
+        sets: {},
+        dynamics: {
+          ...createDefaultModelParameters().dynamics,
+          confidenceWeights: {
+            ...createDefaultModelParameters().dynamics.confidenceWeights,
+            base: Number.NaN,
+          },
+        },
+      }),
+    ).toThrow();
   });
 
   it('provides the StateTransitionProvider implementation and immutable output', () => {
     const provider = new DeterministicEmotionalDynamicsProvider();
     const before = JSON.stringify(state);
-    const result = provider.transition({ currentState: state, event: positiveEvent, personalityProfile: profile });
+    const result = provider.transition({
+      currentState: state,
+      event: positiveEvent,
+      personalityProfile: profile,
+    });
     expect(provider.identifier).toBe('deterministic-emotional-dynamics');
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.nextState)).toBe(true);
@@ -166,5 +270,121 @@ describe('deterministic emotional dynamics', () => {
     } as unknown as ModelParameters;
 
     expect(() => validateModelParameters(malicious)).toThrow();
+  });
+
+  it('rejects positive fear and anger interactions into trust', () => {
+    const defaults = createDefaultModelParameters();
+    const invalid = {
+      ...defaults,
+      dynamics: {
+        ...defaults.dynamics,
+        interactionWeights: {
+          ...defaults.dynamics.interactionWeights,
+          fear: { ...defaults.dynamics.interactionWeights.fear, trust: 0.1 },
+        },
+      },
+    } as unknown as ModelParameters;
+
+    expect(() => validateModelParameters(invalid)).toThrow(
+      'Interaction policy forbids positive fear to trust influence.',
+    );
+  });
+
+  it('accepts custom interaction weights that preserve the trust policy', () => {
+    const defaults = createDefaultModelParameters();
+    const valid = {
+      ...defaults,
+      dynamics: {
+        ...defaults.dynamics,
+        interactionWeights: {
+          ...defaults.dynamics.interactionWeights,
+          fear: { ...defaults.dynamics.interactionWeights.fear, trust: -0.1 },
+          anger: { ...defaults.dynamics.interactionWeights.anger, trust: 0 },
+        },
+      },
+    } as unknown as ModelParameters;
+
+    expect(
+      validateModelParameters(valid).dynamics.interactionWeights.fear.trust,
+    ).toBe(-0.1);
+  });
+
+  it('rejects positive anger interaction into trust with a domain error', () => {
+    const defaults = createDefaultModelParameters();
+    const invalid = {
+      ...defaults,
+      dynamics: {
+        ...defaults.dynamics,
+        interactionWeights: {
+          ...defaults.dynamics.interactionWeights,
+          anger: { ...defaults.dynamics.interactionWeights.anger, trust: 0.1 },
+        },
+      },
+    } as unknown as ModelParameters;
+
+    expect(() => validateModelParameters(invalid)).toThrow(
+      'Interaction policy forbids positive anger to trust influence.',
+    );
+    expect(() => transition(negativeEvent, [], invalid)).toThrow(
+      'Interaction policy forbids positive anger to trust influence.',
+    );
+  });
+
+  it('rejects malformed interaction matrix shapes and values at validation boundary', () => {
+    const defaults = createDefaultModelParameters();
+    const complete = Object.fromEntries(
+      emotionNames.map((source) => [
+        source,
+        { ...defaults.dynamics.interactionWeights[source] },
+      ]),
+    );
+    const invalidMatrices = [
+      Object.fromEntries(Object.entries(complete).filter(([source]) => source !== 'fear')),
+      {
+        ...complete,
+        fear: Object.fromEntries(
+          Object.entries(complete.fear).filter(([target]) => target !== 'trust'),
+        ),
+      },
+      { ...complete, fear: { ...complete.fear, trust: undefined } },
+      { ...complete, fear: { ...complete.fear, trust: null } },
+      { ...complete, fear: { ...complete.fear, trust: Number.NaN } },
+      { ...complete, fear: { ...complete.fear, trust: Number.POSITIVE_INFINITY } },
+      { ...complete, fear: { ...complete.fear, trust: Number.NEGATIVE_INFINITY } },
+      { ...complete, fear: { ...complete.fear, trust: 'invalid' } },
+      { ...complete, fear: { ...complete.fear, trust: 1.1 } },
+    ];
+
+    for (const interactionWeights of invalidMatrices) {
+      expect(() => validateModelParameters(
+        parametersWithInteractionWeights(interactionWeights),
+      )).toThrow(InvalidDomainObjectError);
+    }
+
+    expect(() => validateModelParameters(parametersWithInteractionWeights({
+      ...complete,
+      fear: { ...complete.fear, trust: 0.1 },
+    }))).toThrow(InvalidDomainObjectError);
+    expect(() => validateModelParameters(parametersWithInteractionWeights({
+      ...complete,
+      anger: { ...complete.anger, trust: 0.1 },
+    }))).toThrow(InvalidDomainObjectError);
+
+    expect(validateModelParameters(
+      parametersWithInteractionWeights({
+        ...complete,
+        fear: { ...complete.fear, trust: -0.1 },
+        anger: { ...complete.anger, trust: 0 },
+      }),
+    ).dynamics.interactionWeights.fear.trust).toBe(-0.1);
+
+    expect(() => validateModelParameters(parametersWithInteractionWeights({
+      ...complete,
+      surprise: { ...complete.fear },
+    }))).toThrow(InvalidDomainObjectError);
+    expect(() => validateModelParameters(parametersWithInteractionWeights({
+      ...complete,
+      fear: { ...complete.fear, surprise: 0 },
+    }))).toThrow(InvalidDomainObjectError);
   });
 });

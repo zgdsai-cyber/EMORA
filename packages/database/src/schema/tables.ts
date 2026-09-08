@@ -2,6 +2,7 @@ import {
   customType,
   doublePrecision,
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -168,6 +169,10 @@ export const projects = pgTable(
       table.organizationId,
       table.slug,
     ),
+    uniqueIndex('projects_organization_id_unique').on(
+      table.organizationId,
+      table.id,
+    ),
     index('projects_organization_id_idx').on(table.organizationId),
   ],
 );
@@ -188,6 +193,7 @@ export const apiKeys = pgTable(
   },
   (table) => [
     uniqueIndex('api_keys_key_hash_unique').on(table.keyHash),
+    uniqueIndex('api_keys_project_id_unique').on(table.projectId, table.id),
     index('api_keys_project_id_idx').on(table.projectId),
   ],
 );
@@ -208,6 +214,10 @@ export const emotionalProfiles = pgTable(
     uniqueIndex('emotional_profiles_project_external_reference_unique').on(
       table.projectId,
       table.externalReference,
+    ),
+    uniqueIndex('emotional_profiles_project_id_unique').on(
+      table.projectId,
+      table.id,
     ),
     index('emotional_profiles_project_id_idx').on(table.projectId),
   ],
@@ -238,6 +248,15 @@ export const emotionalEvents = pgTable(
     index('emotional_events_project_id_idx').on(table.projectId),
     index('emotional_events_profile_id_idx').on(table.profileId),
     index('emotional_events_timestamp_idx').on(table.timestamp),
+    uniqueIndex('emotional_events_project_id_unique').on(
+      table.projectId,
+      table.id,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.profileId],
+      foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
+      name: 'emotional_events_project_profile_fk',
+    }),
   ],
 );
 
@@ -285,6 +304,11 @@ export const emotionalStates = pgTable(
     index('emotional_states_project_id_idx').on(table.projectId),
     index('emotional_states_profile_id_idx').on(table.profileId),
     index('emotional_states_timestamp_idx').on(table.timestamp),
+    foreignKey({
+      columns: [table.projectId, table.profileId],
+      foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
+      name: 'emotional_states_project_profile_fk',
+    }),
   ],
 );
 
@@ -314,6 +338,11 @@ export const emotionalMemories = pgTable(
     index('emotional_memories_project_id_idx').on(table.projectId),
     index('emotional_memories_profile_id_idx').on(table.profileId),
     index('emotional_memories_timestamp_idx').on(table.timestamp),
+    foreignKey({
+      columns: [table.projectId, table.profileId],
+      foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
+      name: 'emotional_memories_project_profile_fk',
+    }),
   ],
 );
 
@@ -339,6 +368,21 @@ export const emotionPredictions = pgTable(
   (table) => [
     index('emotion_predictions_project_id_idx').on(table.projectId),
     index('emotion_predictions_profile_id_idx').on(table.profileId),
+    uniqueIndex('emotion_predictions_project_profile_id_unique').on(
+      table.projectId,
+      table.profileId,
+      table.id,
+    ),
+    foreignKey({
+      columns: [table.projectId, table.profileId],
+      foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
+      name: 'emotion_predictions_project_profile_fk',
+    }),
+    foreignKey({
+      columns: [table.projectId, table.eventId],
+      foreignColumns: [emotionalEvents.projectId, emotionalEvents.id],
+      name: 'emotion_predictions_project_event_fk',
+    }),
   ],
 );
 
@@ -362,6 +406,20 @@ export const emotionFeedback = pgTable(
   },
   (table) => [
     index('emotion_feedback_prediction_id_idx').on(table.predictionId),
+    foreignKey({
+      columns: [table.projectId, table.profileId],
+      foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
+      name: 'emotion_feedback_project_profile_fk',
+    }),
+    foreignKey({
+      columns: [table.projectId, table.profileId, table.predictionId],
+      foreignColumns: [
+        emotionPredictions.projectId,
+        emotionPredictions.profileId,
+        emotionPredictions.id,
+      ],
+      name: 'emotion_feedback_project_prediction_fk',
+    }),
   ],
 );
 
@@ -407,6 +465,16 @@ export const usageRecords = pgTable(
     index('usage_records_organization_id_idx').on(table.organizationId),
     index('usage_records_project_id_idx').on(table.projectId),
     index('usage_records_timestamp_idx').on(table.timestamp),
+    foreignKey({
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'usage_records_organization_project_fk',
+    }),
+    foreignKey({
+      columns: [table.projectId, table.apiKeyId],
+      foreignColumns: [apiKeys.projectId, apiKeys.id],
+      name: 'usage_records_project_api_key_fk',
+    }),
   ],
 );
 

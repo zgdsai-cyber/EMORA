@@ -95,7 +95,7 @@ S = intensity \times importance
 $$
 
 A future memory is ignored and contributes zero. An invalid reference
- timestamp is rejected. Memory influence compares the memory vector with the
+timestamp is rejected. Memory influence compares the memory vector with the
 current vector and applies the configured per-emotion memory weight:
 
 $$
@@ -152,9 +152,28 @@ contains event impact, personality modifiers, base influence, interaction
 influence, memory influence, stability influence, and confidence factors. It
 contains no secrets or mutable internal references.
 
+Interaction parameters are split between configurable weights and fixed domain
+policy. `trust.negative` remains structurally disabled, and positive `fear` or
+`anger` contributions into `trust` are rejected by the interaction policy.
+Numeric bounds alone are not sufficient to override these sign invariants.
+Future learned parameters must pass the same policy before they can enter the
+deterministic calculation.
+
+The policy also requires a complete interaction matrix: every supported source
+emotion must provide every supported target emotion with a finite numeric value
+in `[-1, 1]`. Malformed or partial matrices are rejected at parameter
+validation, before deterministic dynamics run.
+
 ## Limitations and next phase
 
 This engine is an experimental deterministic mathematical foundation. It has no
-learned parameters, calibration data, psychological equations, ML provider,
-hybrid fusion, API, database, or real-world validation. Phase 6 may add another
-provider only after its assumptions, ranges, tests, and limitations are defined.
+learned parameters, calibration data, psychological equations, training loop,
+API, database, or real-world validation. The Phase 6.1 ML provider and hybrid
+fusion contracts remain outside these deterministic equations. Future learned
+parameters may be added only after their assumptions, ranges, policies, tests,
+and limitations are defined.
+
+The broader product question of whether a negative event may ever increase
+final trust through memory or temporal stability remains an explicit future
+architecture decision. This hardening does not change memory or stability
+behavior.

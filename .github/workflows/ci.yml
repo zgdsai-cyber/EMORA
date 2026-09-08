@@ -8,6 +8,24 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://emora:emora_ci@localhost:5432/emora
+      AUTH_SECRET: emora-ci-only-secret-not-for-production-32
+      BETTER_AUTH_URL: http://localhost:3000
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: emora
+          POSTGRES_USER: emora
+          POSTGRES_PASSWORD: emora_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U emora -d emora"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,6 +36,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @emora/database db:migrate
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
