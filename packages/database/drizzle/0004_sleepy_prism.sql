@@ -1,0 +1,2 @@
+ALTER TABLE "parameter_versions" ADD CONSTRAINT "parameter_versions_rejected_reason_check" CHECK (("parameter_versions"."status" <> 'REJECTED' OR "parameter_versions"."rejection_reason" IS NOT NULL));--> statement-breakpoint
+ALTER TABLE "parameter_versions" ADD CONSTRAINT "parameter_versions_validated_metadata_check" CHECK (("parameter_versions"."status" <> 'VALIDATED' OR ("parameter_versions"."validated_at" IS NOT NULL AND "parameter_versions"."validated_by" IS NOT NULL AND "parameter_versions"."evaluation_report" IS NOT NULL)));

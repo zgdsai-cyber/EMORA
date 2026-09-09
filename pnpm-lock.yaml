@@ -89,6 +89,9 @@ importers:
       '@emora/database':
         specifier: workspace:*
         version: link:../database
+      '@emora/emotional-core':
+        specifier: workspace:*
+        version: link:../emotional-core
       better-auth:
         specifier: ^1.7.3
         version: 1.7.3(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(gel@2.2.0)(kysely@0.29.5)(postgres@3.4.9))(next@15.5.25(@playwright/test@1.63.0)(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13))

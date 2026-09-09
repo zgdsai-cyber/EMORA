@@ -2,6 +2,7 @@ import {
   customType,
   doublePrecision,
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -13,6 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const timestampWithTimezone = (name: string) =>
   timestamp(name, { withTimezone: true, mode: 'date' });
@@ -31,6 +33,12 @@ export const feedbackType = pgEnum('feedback_type', [
   'OBSERVED_BEHAVIOR',
   'MODEL_PREDICTION',
   'HUMAN_ANNOTATION',
+]);
+
+export const parameterVersionStatus = pgEnum('parameter_version_status', [
+  'CANDIDATE',
+  'VALIDATED',
+  'REJECTED',
 ]);
 
 export const embedding = customType<{
@@ -440,6 +448,106 @@ export const modelParameters = pgTable(
       table.modelVersionId,
       table.name,
     ),
+  ],
+);
+
+export const parameterVersions = pgTable(
+  'parameter_versions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    organizationId: uuid('organization_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    version: text('version').notNull(),
+    parameterSet: jsonb('parameter_set').$type<JsonObject>().notNull(),
+    parameterSetHash: text('parameter_set_hash').notNull(),
+    status: parameterVersionStatus('status').notNull(),
+    parentVersionId: uuid('parent_version_id'),
+    createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
+    createdBy: uuid('created_by').notNull().references(() => users.id),
+    validatedAt: timestampWithTimezone('validated_at'),
+    validatedBy: uuid('validated_by').references(() => users.id),
+    rejectedAt: timestampWithTimezone('rejected_at'),
+    rejectedBy: uuid('rejected_by').references(() => users.id),
+    rejectionReason: text('rejection_reason'),
+    evaluationReport: jsonb('evaluation_report').$type<JsonObject>(),
+  },
+  (table) => [
+    uniqueIndex('parameter_versions_organization_project_version_unique').on(
+      table.organizationId,
+      table.projectId,
+      table.version,
+    ),
+    uniqueIndex('parameter_versions_organization_project_hash_unique').on(
+      table.organizationId,
+      table.projectId,
+      table.parameterSetHash,
+    ),
+    uniqueIndex('parameter_versions_organization_project_id_unique').on(
+      table.organizationId,
+      table.projectId,
+      table.id,
+    ),
+    index('parameter_versions_project_status_idx').on(
+      table.projectId,
+      table.status,
+    ),
+    index('parameter_versions_project_created_at_idx').on(
+      table.projectId,
+      table.createdAt,
+    ),
+    check(
+      'parameter_versions_rejected_reason_check',
+      sql`(${table.status} <> 'REJECTED' OR ${table.rejectionReason} IS NOT NULL)`,
+    ),
+    check(
+      'parameter_versions_validated_metadata_check',
+      sql`(${table.status} <> 'VALIDATED' OR (${table.validatedAt} IS NOT NULL AND ${table.validatedBy} IS NOT NULL AND ${table.evaluationReport} IS NOT NULL))`,
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'parameter_versions_organization_project_fk',
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.projectId, table.parentVersionId],
+      foreignColumns: [table.organizationId, table.projectId, table.id],
+      name: 'parameter_versions_parent_scope_fk',
+    }),
+  ],
+);
+
+export const projectParameterActivation = pgTable(
+  'project_parameter_activation',
+  {
+    projectId: uuid('project_id').primaryKey(),
+    organizationId: uuid('organization_id').notNull(),
+    parameterVersionId: uuid('parameter_version_id').notNull(),
+    activatedAt: timestampWithTimezone('activated_at').defaultNow().notNull(),
+    activatedBy: uuid('activated_by').notNull().references(() => users.id),
+  },
+  (table) => [
+    uniqueIndex('project_parameter_activation_organization_project_unique').on(
+      table.organizationId,
+      table.projectId,
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+      name: 'project_parameter_activation_project_fk',
+    }),
+    foreignKey({
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.parameterVersionId,
+      ],
+      foreignColumns: [
+        parameterVersions.organizationId,
+        parameterVersions.projectId,
+        parameterVersions.id,
+      ],
+      name: 'project_parameter_activation_version_fk',
+    }),
   ],
 );
 

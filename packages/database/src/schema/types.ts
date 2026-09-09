@@ -11,6 +11,8 @@ import type {
   emotionFeedback,
   modelParameters,
   modelVersions,
+  parameterVersions,
+  projectParameterActivation,
   organizationMembers,
   organizations,
   projects,
@@ -50,6 +52,10 @@ export type ModelVersion = typeof modelVersions.$inferSelect;
 export type NewModelVersion = typeof modelVersions.$inferInsert;
 export type ModelParameter = typeof modelParameters.$inferSelect;
 export type NewModelParameter = typeof modelParameters.$inferInsert;
+export type ParameterVersion = typeof parameterVersions.$inferSelect;
+export type NewParameterVersion = typeof parameterVersions.$inferInsert;
+export type ProjectParameterActivation = typeof projectParameterActivation.$inferSelect;
+export type NewProjectParameterActivation = typeof projectParameterActivation.$inferInsert;
 export type UsageRecord = typeof usageRecords.$inferSelect;
 export type NewUsageRecord = typeof usageRecords.$inferInsert;
 export type Subscription = typeof subscriptions.$inferSelect;

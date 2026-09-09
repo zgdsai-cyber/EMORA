@@ -18,3 +18,15 @@ export type {
   AuthSession,
 } from './authorization';
 export type { OrganizationRole } from './roles';
+export {
+  activateParameterVersion,
+  createParameterVersion,
+  hashLearnableParameterSet,
+  resolveActiveParameterVersion,
+  rollbackParameterVersion,
+  validateParameterVersion,
+} from './parameter-version';
+export type {
+  ParameterEvaluationReport,
+  ParameterVersionStatus,
+} from './parameter-version';

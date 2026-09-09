@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@emora/database": "workspace:*",
+    "@emora/emotional-core": "workspace:*",
     "better-auth": "^1.7.3",
     "drizzle-orm": "^0.45.2",
     "zod": "^4.5.4"

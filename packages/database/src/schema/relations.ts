@@ -13,6 +13,8 @@ import {
   emotionFeedback,
   modelParameters,
   modelVersions,
+  parameterVersions,
+  projectParameterActivation,
   organizationMembers,
   organizations,
   projects,
@@ -213,6 +215,46 @@ export const modelParametersRelations = relations(
     modelVersion: one(modelVersions, {
       fields: [modelParameters.modelVersionId],
       references: [modelVersions.id],
+    }),
+  }),
+);
+
+export const parameterVersionsRelations = relations(
+  parameterVersions,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [parameterVersions.projectId],
+      references: [projects.id],
+    }),
+    createdByUser: one(users, {
+      fields: [parameterVersions.createdBy],
+      references: [users.id],
+    }),
+    validatedByUser: one(users, {
+      fields: [parameterVersions.validatedBy],
+      references: [users.id],
+    }),
+    rejectedByUser: one(users, {
+      fields: [parameterVersions.rejectedBy],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const projectParameterActivationRelations = relations(
+  projectParameterActivation,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [projectParameterActivation.projectId],
+      references: [projects.id],
+    }),
+    parameterVersion: one(parameterVersions, {
+      fields: [projectParameterActivation.parameterVersionId],
+      references: [parameterVersions.id],
+    }),
+    activatedByUser: one(users, {
+      fields: [projectParameterActivation.activatedBy],
+      references: [users.id],
     }),
   }),
 );
