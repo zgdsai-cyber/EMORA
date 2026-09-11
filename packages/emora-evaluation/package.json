@@ -1,0 +1,19 @@
+{
+  "name": "@emora/evaluation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure L1 mathematical and structural evaluation contracts for EMORA.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@emora/emotional-core": "workspace:*"
+  }
+}

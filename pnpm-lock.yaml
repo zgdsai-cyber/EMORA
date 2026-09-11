@@ -124,6 +124,12 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  packages/emora-evaluation:
+    dependencies:
+      '@emora/emotional-core':
+        specifier: workspace:*
+        version: link:../emotional-core
+
   packages/emotional-core: {}
 
   packages/types: {}
