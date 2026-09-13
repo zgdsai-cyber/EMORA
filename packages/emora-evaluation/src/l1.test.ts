@@ -104,6 +104,8 @@ describe('L1 provider observation', () => {
       engine: {
         provider: new DeterministicEmotionalDynamicsProvider(),
         runtimeContract: 'phase-6.3-l1-v1',
+        engineVersion: '1.0.0',
+        engineCommit: 'l1-test-engine-commit',
       },
       evaluationCase: { identity, input },
     });
@@ -123,6 +125,8 @@ describe('L1 provider observation', () => {
       engine: {
         provider: new DeterministicEmotionalDynamicsProvider(),
         runtimeContract: 'phase-6.3-l1-v1',
+        engineVersion: '1.0.0',
+        engineCommit: 'l1-test-engine-commit',
       },
       evaluationCase: { identity: { ...identity, caseId: 'l1-invalid-input' }, input: invalidInput },
     });
@@ -135,7 +139,12 @@ describe('L1 provider observation', () => {
   it('fails G1 and G2 for an invalid provider output', () => {
     const malformed = { nextState: { emotionVector: { joy: Number.NaN } } };
     const report = runL1Evaluation({
-      engine: { provider: providerWithOutput(malformed), runtimeContract: 'phase-6.3-l1-v1' },
+      engine: {
+        provider: providerWithOutput(malformed),
+        runtimeContract: 'phase-6.3-l1-v1',
+        engineVersion: '1.0.0',
+        engineCommit: 'l1-test-engine-commit',
+      },
       evaluationCase: { identity: { ...identity, caseId: 'l1-invalid-output' }, input },
     });
 
