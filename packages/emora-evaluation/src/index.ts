@@ -5,3 +5,4 @@ export * from './runner';
 export * from './metrics/definitions';
 export * from './metrics/calculations';
 export * from './execution/runner';
+export * from './report/aggregator';
