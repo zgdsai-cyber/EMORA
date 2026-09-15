@@ -1,4 +1,5 @@
 import type {
+  CaseScalarProvenance,
   DataObservationStatus,
   EvaluationExecutionSummary,
   EvaluationMissingnessSummary,
@@ -12,6 +13,7 @@ import type {
   ScientificEvidenceProvenance,
   TechnicalContractViolation,
 } from '../contracts';
+import { verifyDatasetHash } from '../dataset/identity';
 
 function sameDatasetIdentity(
   left: { readonly datasetId: string; readonly datasetVersion: string; readonly datasetHash: string },
@@ -22,19 +24,26 @@ function sameDatasetIdentity(
     && left.datasetHash === right.datasetHash;
 }
 
+function suppliedPerCase(
+  context: EvaluationReportContext,
+  select: (annotation: EvaluationReportContext['dataset']['cases'][number]['referenceAnnotation']) => number | undefined,
+): readonly CaseScalarProvenance[] {
+  return Object.freeze(context.dataset.cases.flatMap((evaluationCase) => {
+    const value = select(evaluationCase.referenceAnnotation);
+    return value === undefined ? [] : [Object.freeze({ caseId: evaluationCase.caseId, value })];
+  }));
+}
+
 function scientificProvenance(context: EvaluationReportContext): ScientificEvidenceProvenance {
-  const annotations = context.dataset.cases.map((evaluationCase) => evaluationCase.referenceAnnotation);
-  const annotatorCounts = annotations
-    .map((annotation) => annotation.annotatorCount)
-    .filter((value): value is number => value !== undefined);
-  const agreements = annotations
-    .map((annotation) => annotation.interRaterAgreement)
-    .filter((value): value is number => value !== undefined);
   return Object.freeze({
     referenceType: context.dataset.referenceType,
+    datasetRole: context.dataset.role,
+    heldOutParameterVersionIds: context.dataset.heldOutParameterVersionIds
+      ? Object.freeze([...context.dataset.heldOutParameterVersionIds])
+      : undefined,
     annotationProvenance: context.dataset.referenceType === 'HUMAN_ANNOTATED' ? 'DEFERRED' : undefined,
-    annotatorCount: annotatorCounts.length === 1 ? annotatorCounts[0] : undefined,
-    interRaterAgreement: agreements.length === 1 ? agreements[0] : undefined,
+    annotatorCountsByCase: suppliedPerCase(context, (annotation) => annotation.annotatorCount),
+    interRaterAgreementsByCase: suppliedPerCase(context, (annotation) => annotation.interRaterAgreement),
     datasetProvenanceMetadata: context.dataset.provenanceMetadata,
   });
 }
@@ -165,6 +174,15 @@ export function aggregateEvaluationReport(
   input: EvaluationReportInput,
   context: EvaluationReportContext,
 ): EvaluationReport {
+  const contextIdentity = {
+    datasetId: context.dataset.datasetId,
+    datasetVersion: context.dataset.datasetVersion,
+    datasetHash: context.dataset.datasetHash,
+  };
+  if (!verifyDatasetHash(context.dataset)) {
+    return reportFailure(context, contextIdentity, 'Report dataset hash does not match its canonical identity.', 'DATASET_HASH_MISMATCH');
+  }
+
   if (input.kind === 'RUN_FAILED') {
     if (!sameDatasetIdentity(input.attemptedDatasetIdentity, context.dataset)) {
       return reportFailure(context, input.attemptedDatasetIdentity, 'Failed evaluation dataset identity does not match the report dataset.', 'DATASET_IDENTITY_MISMATCH');

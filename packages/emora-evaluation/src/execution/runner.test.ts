@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { StateTransitionProvider } from '@emora/emotional-core';
 
-import type { EvaluationRequest } from '../contracts';
+import type { EvaluationDataset, EvaluationRequest } from '../contracts';
+import { computeDatasetHash, EvaluationContractViolationError } from '../dataset/identity';
+import { MAE_METRIC_DEFINITION, RMSE_METRIC_DEFINITION, SPEARMAN_METRIC_DEFINITION } from '../metrics/definitions';
+import { aggregateEvaluationReport } from '../report/aggregator';
 import { runBehavioralEvaluation } from './runner';
 
 const executionMetadata = {
@@ -31,22 +34,35 @@ function provider(
   };
 }
 
+function dataset(
+  evaluationCases: EvaluationRequest['dataset']['cases'],
+  overrides: Partial<EvaluationDataset> = {},
+): EvaluationDataset {
+  const identity = {
+    datasetId: 'synthetic-metrics-fixture',
+    datasetVersion: '1.0.0',
+    referenceType: 'SYNTHETIC_ORACLE' as const,
+    cases: evaluationCases,
+  };
+  return {
+    ...identity,
+    datasetHash: computeDatasetHash(identity),
+    role: 'DESIGN',
+    title: 'Software metric fixture',
+    description: 'Synthetic fixture for runner behavior only.',
+    casesCount: evaluationCases.length,
+    provenanceMetadata: {},
+    ...overrides,
+  };
+}
+
 function request(
   evaluationCases: EvaluationRequest['dataset']['cases'],
   transition: StateTransitionProvider['transition'],
+  datasetOverrides: Partial<EvaluationDataset> = {},
 ): EvaluationRequest {
   return {
-    dataset: {
-      datasetId: 'synthetic-metrics-fixture',
-      datasetVersion: '1.0.0',
-      datasetHash: 'dataset-hash-supplied-by-caller',
-      referenceType: 'SYNTHETIC_ORACLE',
-      title: 'Software metric fixture',
-      description: 'Synthetic fixture for runner behavior only.',
-      casesCount: evaluationCases.length,
-      cases: evaluationCases,
-      provenanceMetadata: {},
-    },
+    dataset: dataset(evaluationCases, datasetOverrides),
     engine: {
       provider: provider(transition),
       runtimeContract: 'node-22-test-contract',
@@ -72,6 +88,19 @@ function exactCase(caseId: string, joyTarget: number, fearTarget: number) {
   };
 }
 
+function rankingCase(caseId: string, targetValues: Record<string, unknown>) {
+  return {
+    caseId,
+    datasetId: 'synthetic-metrics-fixture',
+    input: { caseId },
+    referenceAnnotation: { annotationType: 'RANKING' as const, targetValues },
+  };
+}
+
+function coverageFor(run: ReturnType<typeof runBehavioralEvaluation>, metricId: string, dimension: string) {
+  return run.metricCoverage.find((entry) => entry.metricId === metricId && entry.dimension === dimension);
+}
+
 function allMetricResults(run: ReturnType<typeof runBehavioralEvaluation>) {
   return [
     ...run.caseResults.flatMap((result) => result.metricResults),
@@ -81,16 +110,15 @@ function allMetricResults(run: ReturnType<typeof runBehavioralEvaluation>) {
 
 describe('runBehavioralEvaluation', () => {
   it('preserves dataset/engine/parameter/contract provenance', () => {
-    const run = runBehavioralEvaluation(
-      request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never),
-      executionMetadata,
-    );
+    const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never);
+    const run = runBehavioralEvaluation(evaluationRequest, executionMetadata);
 
     expect(run.datasetIdentity).toEqual({
       datasetId: 'synthetic-metrics-fixture',
       datasetVersion: '1.0.0',
-      datasetHash: 'dataset-hash-supplied-by-caller',
+      datasetHash: evaluationRequest.dataset.datasetHash,
     });
+    expect(run.datasetRole).toBe('DESIGN');
     expect(run.engineIdentity).toEqual({
       engineVersion: '1.0.0',
       engineCommit: 'engine-commit-supplied-by-caller',
@@ -125,6 +153,8 @@ describe('runBehavioralEvaluation', () => {
     expect(Object.isFrozen(run.caseResults[0].modelObservation)).toBe(true);
     expect(Object.isFrozen(run.caseResults[0].modelObservation.observedValues)).toBe(true);
     expect(Object.isFrozen(run.runLevelMetricResults)).toBe(true);
+    expect(Object.isFrozen(run.metricCoverage)).toBe(true);
+    expect(Object.isFrozen(run.technicalContractViolations)).toBe(true);
   });
 
   // Test 1 — MAE is cross-case / fixed-dimension (Model B).
@@ -214,25 +244,278 @@ describe('runBehavioralEvaluation', () => {
     expect([...maeResults, ...rmseResults].some((result) => result.dimension.includes(','))).toBe(false);
   });
 
-  // Test 3 — Spearman remains case-level.
-  it('keeps Spearman as a case-level result tied to its own EvaluationCase', () => {
-    const rankingCase = {
-      caseId: 'case-ranking',
-      datasetId: 'synthetic-metrics-fixture',
-      input: { caseId: 'case-ranking' },
-      referenceAnnotation: {
-        annotationType: 'RANKING' as const,
-        targetValues: { joy: 3, fear: 1, valence: 2 },
-      },
-    };
+  // Test 3 — Spearman remains case-level (MDS §5.2 unit = (case, ranking-space)).
+  it('keeps Spearman as a case-level result tied to its own EvaluationCase in the EMOTION ranking space', () => {
     const run = runBehavioralEvaluation(
-      request([rankingCase], () => validResult(0.9, 0.1) as never),
+      request([rankingCase('case-ranking', { joy: 1, fear: 3, anger: 2 })], () => ({
+        ...validResult(0.9, 0.1),
+        nextState: { ...validResult(0.9, 0.1).nextState, emotionVector: { joy: 0.9, fear: 0.1, anger: 0.5 } },
+      }) as never),
       executionMetadata,
     );
 
     expect(run.caseResults[0].caseId).toBe('case-ranking');
     expect(run.caseResults[0].metricResults.map((result) => result.metricId)).toEqual(['SPEARMAN_RHO']);
+    expect(run.caseResults[0].metricResults[0].dimension).toBe('EMOTION');
+    expect(run.caseResults[0].metricResults[0].value).toBeCloseTo(1);
     expect(run.runLevelMetricResults).toBeUndefined();
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')).toMatchObject({ planned: 1, eligible: 1, contributing: 1, excluded: 0 });
+  });
+
+  // MDS §6.3 — RANK_1_IS_HIGHEST: rank 1 must align with the highest model score.
+  it('applies RANK_1_IS_HIGHEST so an inverted reference ranking yields rho = -1', () => {
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-ranking', { joy: 3, fear: 1, anger: 2 })], () => ({
+        ...validResult(0.9, 0.1),
+        nextState: { ...validResult(0.9, 0.1).nextState, emotionVector: { joy: 0.9, fear: 0.1, anger: 0.5 } },
+      }) as never),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].metricResults[0].value).toBeCloseTo(-1);
+  });
+
+  // MDS §6.3 — fractional ranks for model-side ties.
+  it('assigns fractional ranks to tied model scores', () => {
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-ranking', { joy: 1, fear: 2, anger: 3 })], () => ({
+        ...validResult(0.9, 0.9),
+        nextState: { ...validResult(0.9, 0.9).nextState, emotionVector: { joy: 0.9, fear: 0.9, anger: 0.1 } },
+      }) as never),
+      executionMetadata,
+    );
+
+    // reference ranks 1,2,3 vs model fractional ranks 1.5,1.5,3 -> rho = 0.866
+    expect(run.caseResults[0].metricResults[0].status).toBe('COMPUTED');
+    expect(run.caseResults[0].metricResults[0].value).toBeCloseTo(Math.sqrt(3) / 2, 5);
+  });
+
+  // MDS §6.4 negative test — mixed semantic space is a technical contract violation, never a Spearman result.
+  it('rejects a ranking that mixes EMOTION with CONTINUOUS_AFFECT as MIXED_SEMANTIC_SPACE', () => {
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-mixed', { joy: 1, fear: 3, valence: 2 })], () => validResult(0.9, 0.1) as never),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].metricResults).toEqual([]);
+    expect(run.technicalContractViolations).toEqual([
+      { violation: 'MIXED_SEMANTIC_SPACE', caseId: 'case-mixed', source: 'REFERENCE', dimension: 'valence', metricId: 'SPEARMAN_RHO' },
+    ]);
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')).toMatchObject({
+      planned: 1,
+      eligible: 0,
+      contributing: 0,
+      excluded: 1,
+      exclusions: [{ caseId: 'case-mixed', reason: 'MIXED_SEMANTIC_SPACE', detail: 'valence' }],
+    });
+  });
+
+  // MDS §3.4 — unknown dimensions are reported, never silently ignored.
+  it('reports UNKNOWN_DIMENSION for reference dimensions absent from the registry', () => {
+    const run = runBehavioralEvaluation(
+      request([
+        rankingCase('case-unknown-rank', { joy: 1, serenity: 2 }),
+        { ...exactCase('case-unknown-exact', 0.5, 0.5), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: 0.5, serenity: 0.5 } } },
+      ], () => validResult(0.5, 0.5) as never),
+      executionMetadata,
+    );
+
+    expect(run.technicalContractViolations.map((violation) => [violation.violation, violation.caseId, violation.dimension])).toEqual([
+      ['UNKNOWN_DIMENSION', 'case-unknown-rank', 'serenity'],
+      ['UNKNOWN_DIMENSION', 'case-unknown-exact', 'serenity'],
+      ['UNKNOWN_DIMENSION', 'case-unknown-exact', 'serenity'],
+    ]);
+    expect(run.technicalContractViolations.every((violation) => violation.source === 'REFERENCE')).toBe(true);
+    expect(coverageFor(run, 'MAE', 'serenity')).toMatchObject({ planned: 1, eligible: 0, contributing: 0, exclusions: [{ caseId: 'case-unknown-exact', reason: 'UNKNOWN_DIMENSION' }] });
+    expect((run.runLevelMetricResults ?? []).some((result) => result.dimension === 'serenity')).toBe(false);
+    expect(coverageFor(run, 'MAE', 'joy')).toMatchObject({ planned: 1, contributing: 1 });
+  });
+
+  // Review Point A2 — unknown model-output metadata outside the contract is not a violation and does not exclude the case.
+  it('evaluates known contractual dimensions unchanged when the model emits unrelated unknown metadata', () => {
+    const run = runBehavioralEvaluation(
+      request([exactCase('case-1', 0.6, 0.2), rankingCase('case-rank', { joy: 1, fear: 2 })], () => ({
+        ...validResult(0.6, 0.2),
+        nextState: { ...validResult(0.6, 0.2).nextState, emotionVector: { joy: 0.6, fear: 0.2, serenity: 0.9 } },
+      }) as never),
+      executionMetadata,
+    );
+
+    expect(run.technicalContractViolations).toEqual([]);
+    expect(run.caseResults[0].modelObservation.observedValues?.serenity).toBe(0.9);
+    expect(coverageFor(run, 'MAE', 'joy')).toMatchObject({ planned: 1, eligible: 1, contributing: 1, excluded: 0 });
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')).toMatchObject({ planned: 1, eligible: 1, contributing: 1, excluded: 0 });
+    expect(run.metricCoverage.some((entry) => entry.dimension === 'serenity')).toBe(false);
+  });
+
+  // MDS §6.2 (A1) — reference competition ranks; ties allowed; other integer labels rejected.
+  const emotionDims = ['joy', 'fear', 'anger', 'trust', 'love'] as const;
+  function rankingFixture(ranks: readonly number[]) {
+    const dims = emotionDims.slice(0, ranks.length);
+    const targetValues = Object.fromEntries(dims.map((dim, index) => [dim, ranks[index]]));
+    const emotionVector = Object.fromEntries(dims.map((dim, index) => [dim, 1 - index * 0.1]));
+    return { targetValues, transition: () => ({ ...validResult(0.5, 0.5), nextState: { ...validResult(0.5, 0.5).nextState, emotionVector } }) as never };
+  }
+
+  it.each([
+    [[1, 2, 3]],
+    [[1, 1, 3]],
+    [[1, 2, 2]],
+    [[1, 1, 3, 4]],
+    [[1, 2, 2, 4]],
+    [[1, 2, 2, 2]],
+    [[1, 2, 2, 2, 5]],
+  ])('accepts valid competition ranking %j and computes Spearman', (ranks) => {
+    const fixture = rankingFixture(ranks);
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-valid', fixture.targetValues)], fixture.transition),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].metricResults[0]).toMatchObject({ metricId: 'SPEARMAN_RHO', status: 'COMPUTED', dimension: 'EMOTION' });
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')).toMatchObject({ planned: 1, eligible: 1, contributing: 1, excluded: 0 });
+    expect(run.technicalContractViolations).toEqual([]);
+  });
+
+  it.each([
+    [[1, 1, 2]],
+    [[1, 2, 2, 3]],
+    [[2, 2, 3]],
+    [[1, 1, 4]],
+    [[1, 1, 4, 4]],
+    [[0, 1, 2]],
+    [[1, 2, 3, 5]],
+    [[1.5, 1.5, 3]],
+  ])('rejects reference ranking %j as REFERENCE_INVALID without a Spearman result', (ranks) => {
+    const fixture = rankingFixture(ranks);
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-bad-rank', fixture.targetValues)], fixture.transition),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].metricResults).toEqual([]);
+    expect(run.technicalContractViolations).toEqual([]);
+    const spearman = coverageFor(run, 'SPEARMAN_RHO', 'EMOTION');
+    expect(spearman).toMatchObject({ planned: 1, eligible: 0, contributing: 0, excluded: 1 });
+    expect(spearman?.exclusions[0]).toMatchObject({ caseId: 'case-bad-rank', reason: 'REFERENCE_INVALID' });
+    expect(spearman?.exclusions[0].detail).toContain('competition ranking');
+  });
+
+  // MDS §6.3 (A1) — approved: reference competition ties become average ranks for Spearman; the annotation is preserved.
+  it('converts tied reference competition ranks to average ranks for Spearman while preserving the original annotation', () => {
+    const referenceCase = rankingCase('case-tied-ref', { joy: 1, fear: 1, anger: 3 });
+    const evaluationRequest = request([referenceCase], () => ({
+      ...validResult(0.9, 0.9),
+      nextState: { ...validResult(0.9, 0.9).nextState, emotionVector: { joy: 0.9, fear: 0.9, anger: 0.1 } },
+    }) as never);
+    const run = runBehavioralEvaluation(evaluationRequest, executionMetadata);
+
+    // reference [1,1,3] -> [1.5,1.5,3]; model (0.9,0.9,0.1) -> [1.5,1.5,3]; rho = 1
+    expect(run.caseResults[0].metricResults[0]).toMatchObject({ status: 'COMPUTED', dimension: 'EMOTION' });
+    expect(run.caseResults[0].metricResults[0].value).toBeCloseTo(1);
+    expect(evaluationRequest.dataset.cases[0].referenceAnnotation.targetValues).toEqual({ joy: 1, fear: 1, anger: 3 });
+
+    // Model side ranks independently: reference tie vs strict model ordering gives rho = sqrt(3)/2.
+    const strictModel = runBehavioralEvaluation(
+      request([referenceCase], () => ({
+        ...validResult(0.9, 0.5),
+        nextState: { ...validResult(0.9, 0.5).nextState, emotionVector: { joy: 0.9, fear: 0.5, anger: 0.1 } },
+      }) as never),
+      executionMetadata,
+    );
+    expect(strictModel.caseResults[0].metricResults[0].value).toBeCloseTo(Math.sqrt(3) / 2, 5);
+  });
+
+  // Review Point C — MetricCoverage is authoritative; exclusion reasons are not collapsed into "missing".
+  it('keeps UNKNOWN_DIMENSION and MIXED_SEMANTIC_SPACE as distinct exclusion reasons rather than missing data', () => {
+    const run = runBehavioralEvaluation(
+      request([
+        rankingCase('case-mixed', { joy: 1, valence: 2 }),
+        { ...exactCase('case-unknown', 0, 0), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { serenity: 0.1 } } },
+        { ...exactCase('case-missing', 0, 0), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: undefined } } },
+      ], () => validResult(0.5, 0.5) as never),
+      executionMetadata,
+    );
+
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')?.exclusions).toEqual([{ caseId: 'case-mixed', reason: 'MIXED_SEMANTIC_SPACE', detail: 'valence' }]);
+    expect(coverageFor(run, 'MAE', 'serenity')?.exclusions).toEqual([{ caseId: 'case-unknown', reason: 'UNKNOWN_DIMENSION' }]);
+    expect(coverageFor(run, 'MAE', 'joy')?.exclusions).toEqual([{ caseId: 'case-missing', reason: 'REFERENCE_MISSING' }]);
+    const reasons = run.metricCoverage.flatMap((entry) => entry.exclusions.map((exclusion) => exclusion.reason));
+    expect(new Set(reasons)).toEqual(new Set(['MIXED_SEMANTIC_SPACE', 'UNKNOWN_DIMENSION', 'REFERENCE_MISSING']));
+    // Legacy field is not a coverage projection: stays at the pure-function value.
+    expect((run.runLevelMetricResults ?? []).every((result) => result.missingCasesCount === 0)).toBe(true);
+  });
+
+  // Review Point D — both hash-mismatch paths: runner throws before any run exists; a RUN_FAILED attempt reaches the aggregator as FAILED.
+  it('propagates a runner DATASET_HASH_MISMATCH through a RUN_FAILED attempt to a FAILED report', () => {
+    const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { datasetHash: 'not-the-canonical-hash' });
+    let thrown: EvaluationContractViolationError | undefined;
+    try {
+      runBehavioralEvaluation(evaluationRequest, executionMetadata);
+    } catch (error) {
+      thrown = error as EvaluationContractViolationError;
+    }
+    expect(thrown?.violation).toBe('DATASET_HASH_MISMATCH');
+
+    const attemptedDatasetIdentity = {
+      datasetId: evaluationRequest.dataset.datasetId,
+      datasetVersion: evaluationRequest.dataset.datasetVersion,
+      datasetHash: evaluationRequest.dataset.datasetHash,
+    };
+    const report = aggregateEvaluationReport(
+      { kind: 'RUN_FAILED', failureReason: thrown!.message, attemptedDatasetIdentity, technicalFailure: thrown!.violation },
+      {
+        reportId: 'report-hash-path',
+        dataset: evaluationRequest.dataset,
+        metricDefinitions: [MAE_METRIC_DEFINITION, RMSE_METRIC_DEFINITION, SPEARMAN_METRIC_DEFINITION],
+        referenceObservationStatuses: { datasetIdentity: attemptedDatasetIdentity, observations: [] },
+      },
+    );
+
+    expect(report.executionStatus).toBe('FAILED');
+    if (report.executionStatus !== 'FAILED') throw new Error('Expected failed report.');
+    expect(report.technicalFailure).toBe('DATASET_HASH_MISMATCH');
+    expect('run' in report).toBe(false);
+  });
+
+  // MDS §6.5 — n < 2 is a computational exclusion, not a silent skip.
+  it('records INSUFFICIENT_DATA coverage for a single-item ranking', () => {
+    const run = runBehavioralEvaluation(
+      request([rankingCase('case-one', { joy: 1 })], () => validResult(0.9, 0.1) as never),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].metricResults).toEqual([]);
+    expect(coverageFor(run, 'SPEARMAN_RHO', 'EMOTION')?.exclusions).toEqual([
+      { caseId: 'case-one', reason: 'INSUFFICIENT_DATA', detail: 'n=1 < 2' },
+    ]);
+  });
+
+  // MDS §6.6 / §8.2 — excluded ranking cases stay observable with their reason.
+  it('keeps excluded ranking cases observable through coverage with distinct execution and reference reasons', () => {
+    const run = runBehavioralEvaluation(
+      request([
+        rankingCase('case-failed', { joy: 1, fear: 2 }),
+        rankingCase('case-invalid-ref', { joy: 1, fear: 'second' }),
+        rankingCase('case-zero-rank', { joy: 0, fear: 1 }),
+        rankingCase('case-absent-model', { joy: 1, anger: 2 }),
+        rankingCase('case-ok', { joy: 1, fear: 2 }),
+      ], (input) => {
+        if ((input as unknown as { caseId: string }).caseId === 'case-failed') throw new Error('boom');
+        return validResult(0.9, 0.1) as never;
+      }),
+      executionMetadata,
+    );
+
+    const spearman = coverageFor(run, 'SPEARMAN_RHO', 'EMOTION');
+    expect(spearman).toMatchObject({ planned: 5, eligible: 1, contributing: 1, excluded: 4 });
+    expect(spearman?.exclusions.map((exclusion) => [exclusion.caseId, exclusion.reason])).toEqual([
+      ['case-failed', 'EXECUTION_FAILED'],
+      ['case-invalid-ref', 'REFERENCE_INVALID'],
+      ['case-zero-rank', 'REFERENCE_INVALID'],
+      ['case-absent-model', 'MODEL_DIMENSION_ABSENT'],
+    ]);
+    expect(run.technicalContractViolations).toEqual([]);
   });
 
   // Test 4 — Pearson is not executed.
@@ -300,22 +583,128 @@ describe('runBehavioralEvaluation', () => {
     const maeResults = (run.runLevelMetricResults ?? []).filter((result) => result.metricId === 'MAE');
     // Only the single SUCCESS case contributes; sampleSize must reflect exactly that, never fabricated zeros.
     expect(maeResults.every((result) => result.sampleSize === 1)).toBe(true);
+    expect(maeResults.every((result) => result.missingCasesCount === 0)).toBe(true);
     expect(maeResults.find((result) => result.dimension === 'joy')?.value).toBeCloseTo(0);
+    expect(coverageFor(run, 'MAE', 'joy')).toMatchObject({
+      planned: 3,
+      eligible: 1,
+      contributing: 1,
+      excluded: 2,
+      exclusions: [
+        { caseId: 'case-fail', reason: 'EXECUTION_FAILED' },
+        { caseId: 'case-invalid', reason: 'EXECUTION_INVALID_OUTPUT' },
+      ],
+    });
+  });
+
+  // MDS §3.3 / §4 — COMPUTATIONAL dimensions never enter behavioral MAE/RMSE.
+  it('excludes confidence and confidenceAdjustment from behavioral MAE/RMSE without deleting them from model output', () => {
+    const run = runBehavioralEvaluation(
+      request([{
+        ...exactCase('case-conf', 0.6, 0.2),
+        referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: 0.6, confidence: 0.8, confidenceAdjustment: 0 } },
+      }], () => validResult(0.6, 0.2) as never),
+      executionMetadata,
+    );
+
+    expect(run.caseResults[0].modelObservation.observedValues?.confidence).toBe(0.8);
+    expect((run.runLevelMetricResults ?? []).map((result) => result.dimension)).toEqual(['joy', 'joy']);
+    expect(coverageFor(run, 'MAE', 'confidence')).toMatchObject({
+      planned: 1,
+      eligible: 0,
+      contributing: 0,
+      exclusions: [{ caseId: 'case-conf', reason: 'COMPUTATIONAL_DIMENSION_EXCLUDED' }],
+    });
+    expect(coverageFor(run, 'RMSE', 'confidenceAdjustment')?.exclusions[0].reason).toBe('COMPUTATIONAL_DIMENSION_EXCLUDED');
+    expect(run.technicalContractViolations).toEqual([]);
+  });
+
+  // MDS §7 — valence error may exceed 1; MAE/RMSE are non-negative error statistics.
+  it('evaluates valence independently with absolute error up to 2', () => {
+    const run = runBehavioralEvaluation(
+      request([{
+        ...exactCase('case-valence', 0, 0),
+        referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { valence: -1 } },
+      }], () => validResult(1, 0) as never),
+      executionMetadata,
+    );
+
+    const mae = (run.runLevelMetricResults ?? []).find((result) => result.metricId === 'MAE' && result.dimension === 'valence');
+    expect(mae?.status).toBe('COMPUTED');
+    expect(mae?.value).toBeCloseTo(2);
+  });
+
+  // MDS §8.1 — missing and invalid references are distinct exclusion reasons.
+  it('distinguishes REFERENCE_MISSING from REFERENCE_INVALID in coverage', () => {
+    const run = runBehavioralEvaluation(
+      request([
+        { ...exactCase('case-missing', 0, 0), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: null } } },
+        { ...exactCase('case-invalid', 0, 0), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: 'high' } } },
+      ], () => validResult(0.5, 0.5) as never),
+      executionMetadata,
+    );
+
+    expect(coverageFor(run, 'MAE', 'joy')).toMatchObject({
+      planned: 2,
+      eligible: 0,
+      contributing: 0,
+      excluded: 2,
+      exclusions: [
+        { caseId: 'case-missing', reason: 'REFERENCE_MISSING' },
+        { caseId: 'case-invalid', reason: 'REFERENCE_INVALID' },
+      ],
+    });
+    const mae = (run.runLevelMetricResults ?? []).find((result) => result.metricId === 'MAE' && result.dimension === 'joy');
+    expect(mae?.status).toBe('INSUFFICIENT_DATA');
+    expect(mae?.missingCasesCount).toBe(0);
+    expect(coverageFor(run, 'MAE', 'joy')?.excluded).toBe(2);
+  });
+
+  // MDS §13 — dataset hash mismatch is fatal, not a warning.
+  it('throws DATASET_HASH_MISMATCH when the claimed dataset hash is not canonical', () => {
+    const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { datasetHash: 'not-the-canonical-hash' });
+
+    expect(() => runBehavioralEvaluation(evaluationRequest, executionMetadata)).toThrowError(EvaluationContractViolationError);
+    try {
+      runBehavioralEvaluation(evaluationRequest, executionMetadata);
+    } catch (error) {
+      expect((error as EvaluationContractViolationError).violation).toBe('DATASET_HASH_MISMATCH');
+    }
+  });
+
+  // MDS §12 — HELD_OUT provenance is preserved verbatim.
+  it('preserves HELD_OUT role and held-out parameter versions', () => {
+    const run = runBehavioralEvaluation(
+      request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'HELD_OUT', heldOutParameterVersionIds: ['pv-1', 'pv-2'] }),
+      executionMetadata,
+    );
+
+    expect(run.datasetRole).toBe('HELD_OUT');
+    expect(run.heldOutParameterVersionIds).toEqual(['pv-1', 'pv-2']);
+    expect(Object.isFrozen(run.heldOutParameterVersionIds)).toBe(true);
+  });
+
+  // MDS §23 — determinism of the changed paths (coverage, violations, ranking).
+  it('produces identical coverage, violations, and ranking results on repeated execution', () => {
+    const evaluationRequest = request([
+      rankingCase('case-ok', { joy: 1, fear: 2 }),
+      rankingCase('case-mixed', { joy: 1, valence: 2 }),
+      exactCase('case-exact', 0.6, 0.2),
+      { ...exactCase('case-unknown', 0, 0), referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { serenity: 0.1 } } },
+    ], () => validResult(0.6, 0.2) as never);
+
+    const first = runBehavioralEvaluation(evaluationRequest, executionMetadata);
+    const second = runBehavioralEvaluation(evaluationRequest, executionMetadata);
+    expect(first).toEqual(second);
+    expect(first.metricCoverage).toEqual(second.metricCoverage);
+    expect(first.technicalContractViolations).toEqual(second.technicalContractViolations);
   });
 
   // Test 7 — no composite dimensions anywhere in the result set.
   it('never encodes composite/joined dimension labels in any MetricResult', () => {
     const cases = [
       exactCase('case-1', 0.6, 0.2),
-      {
-        caseId: 'case-ranking',
-        datasetId: 'synthetic-metrics-fixture',
-        input: { caseId: 'case-ranking' },
-        referenceAnnotation: {
-          annotationType: 'RANKING' as const,
-          targetValues: { joy: 3, fear: 1, valence: 2 },
-        },
-      },
+      rankingCase('case-ranking', { joy: 1, fear: 2 }),
     ];
     const run = runBehavioralEvaluation(
       request(cases, () => validResult(0.6, 0.2) as never),

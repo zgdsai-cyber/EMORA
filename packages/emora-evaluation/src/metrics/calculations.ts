@@ -184,6 +184,28 @@ export function computeFractionalRanks(series: readonly number[]): number[] {
   return ranks;
 }
 
+/**
+ * Competition-rank encoding (MDS v1.0 §6.2 A1, RANK_1_IS_HIGHEST): after sorting,
+ * every distinct rank value equals 1 + the number of strictly lower ranks. Ties share
+ * a rank and the following positions are skipped: [1,1,3] and [1,2,2,4] are valid;
+ * [1,1,2], [1,2,2,3], [2,2,3] are not. Deterministic; does not mutate its input.
+ */
+export function isValidCompetitionRanking(ranks: readonly number[]): boolean {
+  if (!Array.isArray(ranks) || ranks.length === 0) return false;
+  if (ranks.some((rank) => typeof rank !== 'number' || !Number.isInteger(rank))) return false;
+  const sorted = [...ranks].sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] === sorted[i - 1]) continue;
+    if (sorted[i] !== i + 1) return false;
+  }
+  return true;
+}
+
+/**
+ * Spearman rho. Each side is converted once to fractional (average) ranks via
+ * computeFractionalRanks: reference competition ranks become average ranks
+ * ([1,1,3] -> [1.5,1.5,3]); model scores become fractional ranks (MDS v1.0 §6.3).
+ */
 export function calculateSpearman(
   observed: readonly number[],
   predicted: readonly number[],
@@ -228,9 +250,8 @@ export function calculateSpearman(
   });
 }
 
-// Kendall tau is DEFERRED — UNDEFINED — REQUIRES METHODOLOGICAL DECISION.
-// The exact variant (tau-a, tau-b, or tau-c) has not been approved; no
-// calculation function is provided until that decision is made.
+// Kendall tau is REMOVED from the Phase 6 roadmap by MDS v1.0 §5.5; no
+// calculation function is authorized.
 
 function getSign(value: number): -1 | 0 | 1 {
   if (value > 0) return 1;

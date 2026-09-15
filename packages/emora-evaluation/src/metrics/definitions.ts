@@ -6,11 +6,12 @@ export const MAE_METRIC_DEFINITION: MetricDefinition = Object.freeze({
   formulaDescription: 'MAE = (1/N) * sum(|y_i - y_hat_i|)',
   targetType: 'EMOTE_VECTOR_DIMENSION',
   annotationType: 'EXACT_VECTOR',
-  scale: 'BOUNDED_0_1',
+  scale: 'ERROR_NON_NEGATIVE',
   assumptions: Object.freeze([
     'MODEL B: sampling unit is one EvaluationCase per observation, for one fixed target dimension, aggregated across the evaluation dataset.',
     'Cross-dimension aggregation within a single case is prohibited; see calculateVectorMAE for the approved per-dimension, multi-case aggregation.',
     'Result scope is run-level, not case-level.',
+    'Error range is bounded by the evaluated dimension\'s registry range (e.g. [0,1] for EMOTION, [0,2] for valence); not a scientific threshold.',
     'Paired finite numerical observations',
     'Linear uniform error penalization',
     'No silent imputation of missing values',
@@ -23,11 +24,12 @@ export const RMSE_METRIC_DEFINITION: MetricDefinition = Object.freeze({
   formulaDescription: 'RMSE = sqrt((1/N) * sum((y_i - y_hat_i)^2))',
   targetType: 'EMOTE_VECTOR_DIMENSION',
   annotationType: 'EXACT_VECTOR',
-  scale: 'BOUNDED_0_1',
+  scale: 'ERROR_NON_NEGATIVE',
   assumptions: Object.freeze([
     'MODEL B: sampling unit is one EvaluationCase per observation, for one fixed target dimension, aggregated across the evaluation dataset.',
     'Cross-dimension aggregation within a single case is prohibited; see calculateVectorRMSE for the approved per-dimension, multi-case aggregation.',
     'Result scope is run-level, not case-level.',
+    'Error range is bounded by the evaluated dimension\'s registry range (e.g. [0,1] for EMOTION, [0,2] for valence); not a scientific threshold.',
     'Paired finite numerical observations',
     'Quadratic penalization of larger deviations',
     'No silent imputation of missing values',
@@ -59,19 +61,22 @@ export const SPEARMAN_METRIC_DEFINITION: MetricDefinition = Object.freeze({
   annotationType: 'RANKING',
   scale: 'BOUNDED_MINUS1_1',
   assumptions: Object.freeze([
-    'MODEL A: sampling unit is the set of ranked EMORA emotion dimensions within a single EvaluationCase/scenario.',
+    'MODEL A: sampling unit is one (case, ranking-space); the ranked items are EMORA emotion dimensions within a single EvaluationCase/scenario.',
+    'Ranking space is EMOTION only (MDS v1.0 §6.1); mixing CONTINUOUS_AFFECT or COMPUTATIONAL dimensions into a ranking is a MIXED_SEMANTIC_SPACE violation.',
+    'Reference targetValues are competition ranks under RANK_1_IS_HIGHEST (MDS v1.0 §6.2/§6.3, A1): integers in [1, n]; ties share a rank and subsequent positions skip (e.g. [1,1,3]); other integer labels are REFERENCE_INVALID.',
+    'Reference competition ranks are converted to average ranks for Spearman input (e.g. [1,1,3] -> [1.5,1.5,3]); the original annotation is preserved unchanged.',
+    'Model scores are converted to fractional ranks with rank 1 for the highest score; the two transformations are distinct and are not merged.',
     'Result scope is case-level; do not generalize into a cross-case fixed-dimension metric.',
     'Paired ordinal or rank-ordered observations',
     'Monotonic association measurement',
     'Fractional average rank assignment for ties',
-    'Conditionally supported on continuous vectors with explicit rank protocol',
+    'Technical minimum n >= 2 is a computational requirement, not a scientific threshold.',
   ]),
 });
 
-// KENDALL TAU: DEFERRED — UNDEFINED — REQUIRES METHODOLOGICAL DECISION.
-// The exact Kendall variant (tau-a, tau-b, or tau-c) is not yet an approved
-// methodological decision. No definition or calculation is provided until
-// the variant is explicitly decided; do not assume tau-b by default.
+// KENDALL TAU: REMOVED from the Phase 6 roadmap by MDS v1.0 §5.5. No definition,
+// calculation, or execution contract is authorized; any future reintroduction
+// would require a pre-specified sensitivity-analysis methodology decision.
 
 export const DIRECTIONAL_ACCURACY_DEFINITION: MetricDefinition = Object.freeze({
   metricId: 'DIRECTIONAL_ACCURACY',

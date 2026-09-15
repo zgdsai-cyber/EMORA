@@ -97,7 +97,10 @@ export type AnnotationType =
   | 'EXACT_VECTOR'
   | 'INTERVAL'
   | 'DISTRIBUTION'
-  /** Ranking of EMORA emotion dimensions within a single EvaluationCase/scenario; not a cross-case ranking. */
+  /**
+   * Ranking of EMORA emotion dimensions within a single EvaluationCase/scenario; not a cross-case ranking.
+   * targetValues are competition ranks (RANK_1_IS_HIGHEST, ties allowed, e.g. {joy:1, fear:1, anger:3}); see SPEARMAN_RANKING_PROTOCOL.
+   */
   | 'RANKING'
   | 'DIRECTIONAL_DELTA';
 
@@ -131,11 +134,22 @@ export interface EvaluationCase {
   readonly referenceAnnotation: ReferenceAnnotation;
 }
 
+/**
+ * MDS v1.0 §12. Provenance only; a role never establishes scientific validity.
+ * DESIGN: consulted while designing/tuning parameters or rules.
+ * HELD_OUT: not consulted during design; `heldOutParameterVersionIds` records
+ * which parameter versions it was held out from, where applicable.
+ */
+export type DatasetRole = 'DESIGN' | 'HELD_OUT';
+
 export interface EvaluationDataset {
   readonly datasetId: string;
   readonly datasetVersion: string;
+  /** Must equal computeDatasetHash(this); see MDS v1.0 §13. */
   readonly datasetHash: string;
   readonly referenceType: ReferenceType;
+  readonly role: DatasetRole;
+  readonly heldOutParameterVersionIds?: readonly string[];
   readonly title: string;
   readonly description: string;
   readonly casesCount: number;
@@ -164,7 +178,8 @@ export interface MetricDefinition {
   readonly formulaDescription: string;
   readonly targetType: EmotionTargetType;
   readonly annotationType: AnnotationType;
-  readonly scale: 'BOUNDED_0_1' | 'BOUNDED_MINUS1_1' | 'ORDINAL' | 'UNBOUNDED';
+  /** Statistic class of the metric output; the evaluated dimension's range is defined by the dimension registry (MDS v1.0 §7). */
+  readonly scale: 'ERROR_NON_NEGATIVE' | 'BOUNDED_0_1' | 'BOUNDED_MINUS1_1' | 'ORDINAL' | 'UNBOUNDED';
   readonly assumptions: readonly string[];
 }
 
@@ -174,9 +189,67 @@ export interface MetricResult {
   readonly dimension: string;
   readonly value: number;
   readonly sampleSize: number;
+  /**
+   * Legacy compatibility field. Pure metric functions receive pre-filtered numeric
+   * series and have no case-level context, so this is always 0 and is NOT a
+   * coverage or missingness measure. MetricCoverage (runner) is authoritative.
+   */
   readonly missingCasesCount: number;
   readonly status: 'COMPUTED' | 'INVALID' | 'INSUFFICIENT_DATA';
   readonly failureReason?: string;
+}
+
+// ============================================================================
+// MDS v1.0 §8 / §21 — COVERAGE AND TECHNICAL VIOLATIONS (evaluation layer only)
+// ============================================================================
+
+/** Why a planned unit did not contribute. Composed from existing execution/reference vocabularies plus MDS §21 violations. */
+export type CoverageExclusionReason =
+  | 'EXECUTION_FAILED'
+  | 'EXECUTION_INVALID_OUTPUT'
+  | 'EXECUTION_NOT_EXECUTED'
+  | 'REFERENCE_MISSING'
+  | 'REFERENCE_INVALID'
+  | 'MODEL_DIMENSION_ABSENT'
+  | 'COMPUTATIONAL_DIMENSION_EXCLUDED'
+  | 'UNKNOWN_DIMENSION'
+  | 'MIXED_SEMANTIC_SPACE'
+  | 'INSUFFICIENT_DATA'
+  | 'METRIC_INVALID';
+
+export interface CoverageExclusion {
+  readonly caseId: string;
+  readonly reason: CoverageExclusionReason;
+  readonly detail?: string;
+}
+
+export type MetricObservationalUnit = 'CASE_DIMENSION' | 'CASE_RANKING_SPACE';
+
+/**
+ * Per-metric coverage over its declared observational unit. `planned` counts
+ * units the reference declared; `eligible` those meeting the metric's
+ * applicability, reference, execution, and behavioral-target requirements;
+ * `contributing` those that entered a COMPUTED result. planned = contributing + excluded.
+ */
+export interface MetricCoverage {
+  readonly metricId: string;
+  readonly unit: MetricObservationalUnit;
+  /** Dimension id for CASE_DIMENSION; ranking-space id for CASE_RANKING_SPACE. */
+  readonly dimension: string;
+  readonly planned: number;
+  readonly eligible: number;
+  readonly contributing: number;
+  readonly excluded: number;
+  readonly exclusions: readonly CoverageExclusion[];
+}
+
+export interface RunTechnicalViolation {
+  readonly violation: 'UNKNOWN_DIMENSION' | 'MIXED_SEMANTIC_SPACE';
+  readonly caseId: string;
+  /** Violations arise only from dimensions that enter the evaluation contract via the reference. */
+  readonly source: 'REFERENCE';
+  readonly dimension?: string;
+  readonly metricId?: string;
 }
 
 // ============================================================================
@@ -214,6 +287,8 @@ export interface EvaluationRun {
   readonly parameterVersionHash?: string;
   readonly evaluationContractVersion: string;
   readonly configurationHash?: string;
+  readonly datasetRole: DatasetRole;
+  readonly heldOutParameterVersionIds?: readonly string[];
   readonly caseResults: readonly EvaluationCaseResult[];
   /**
    * Metrics whose sampling unit is one fixed target dimension aggregated across
@@ -222,6 +297,10 @@ export interface EvaluationRun {
    * Optional and additive; absent until a future runner populates it.
    */
   readonly runLevelMetricResults?: readonly MetricResult[];
+  /** One entry per (metricId, unit dimension); every planned unit's fate is recorded here (MDS v1.0 §8). */
+  readonly metricCoverage: readonly MetricCoverage[];
+  /** Fatal for the affected evidence only; never a warning and never a scientific verdict (MDS v1.0 §21). */
+  readonly technicalContractViolations: readonly RunTechnicalViolation[];
   readonly executionTimestamp: string;
 }
 
@@ -297,12 +376,20 @@ export interface MetricStatusSummary {
  * (HUMAN_ANNOTATED); none of these values constitutes universal or
  * psychological ground truth.
  */
+/** Supplied per-case scalar preserved verbatim; heterogeneity is never collapsed (MDS v1.0 §10.2). */
+export interface CaseScalarProvenance {
+  readonly caseId: string;
+  readonly value: number;
+}
+
 export interface ScientificEvidenceProvenance {
   readonly referenceType: ReferenceType;
+  readonly datasetRole: DatasetRole;
+  readonly heldOutParameterVersionIds?: readonly string[];
   /** DEFERRED until human annotation-collection protocols are approved. */
   readonly annotationProvenance?: 'DEFERRED';
-  readonly annotatorCount?: number;
-  readonly interRaterAgreement?: number;
+  readonly annotatorCountsByCase: readonly CaseScalarProvenance[];
+  readonly interRaterAgreementsByCase: readonly CaseScalarProvenance[];
   readonly datasetProvenanceMetadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -355,7 +442,10 @@ export type TechnicalContractViolation =
   | 'DUPLICATE_RESULT_CASE_ID'
   | 'UNEXPECTED_RESULT_CASE_ID'
   | 'DATASET_IDENTITY_MISMATCH'
-  | 'REFERENCE_STATUS_DATASET_IDENTITY_MISMATCH';
+  | 'DATASET_HASH_MISMATCH'
+  | 'REFERENCE_STATUS_DATASET_IDENTITY_MISMATCH'
+  | 'UNKNOWN_DIMENSION'
+  | 'MIXED_SEMANTIC_SPACE';
 
 /** Facts not derivable from EvaluationRun; EvaluationDataset remains authoritative. */
 export interface EvaluationReportContext {

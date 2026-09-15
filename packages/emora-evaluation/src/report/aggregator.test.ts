@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  EvaluationCase,
   EvaluationDataset,
   EvaluationReportContext,
   EvaluationRun,
   MetricResult,
   ModelObservationStatus,
 } from '../contracts';
+import { computeDatasetHash } from '../dataset/identity';
 import {
   DIRECTIONAL_ACCURACY_DEFINITION,
   MAE_METRIC_DEFINITION,
@@ -16,27 +18,40 @@ import {
 } from '../metrics/definitions';
 import { aggregateEvaluationReport } from './aggregator';
 
-const datasetIdentity = {
-  datasetId: 'report-fixture-dataset',
-  datasetVersion: '1.0.0',
-  datasetHash: 'report-fixture-hash',
-};
+const datasetId = 'report-fixture-dataset';
+const datasetVersion = '1.0.0';
 
-function dataset(caseIds = ['case-1', 'case-2']): EvaluationDataset {
+function fixtureCases(caseIds: readonly string[]): EvaluationCase[] {
+  return caseIds.map((caseId) => ({
+    caseId,
+    datasetId,
+    input: {},
+    referenceAnnotation: { annotationType: 'EXACT_VECTOR', targetValues: { joy: 0.5 } },
+  }));
+}
+
+function dataset(caseIds: readonly string[] = ['case-1', 'case-2'], cases: readonly EvaluationCase[] = fixtureCases(caseIds)): EvaluationDataset {
+  const identity = { datasetId, datasetVersion, referenceType: 'SYNTHETIC_ORACLE' as const, cases };
   return {
-    ...datasetIdentity,
-    referenceType: 'SYNTHETIC_ORACLE',
+    ...identity,
+    datasetHash: computeDatasetHash(identity),
+    role: 'DESIGN',
     title: 'Software report fixture',
     description: 'Synthetic fixture for report aggregation only.',
-    casesCount: caseIds.length,
-    cases: caseIds.map((caseId) => ({
-      caseId,
-      datasetId: datasetIdentity.datasetId,
-      input: {},
-      referenceAnnotation: { annotationType: 'EXACT_VECTOR', targetValues: { joy: 0.5 } },
-    })),
+    casesCount: cases.length,
     provenanceMetadata: { fixture: true },
   };
+}
+
+const defaultDataset = dataset();
+const datasetIdentity = {
+  datasetId: defaultDataset.datasetId,
+  datasetVersion: defaultDataset.datasetVersion,
+  datasetHash: defaultDataset.datasetHash,
+};
+
+function identityOf(fixtureDataset: EvaluationDataset) {
+  return { datasetId: fixtureDataset.datasetId, datasetVersion: fixtureDataset.datasetVersion, datasetHash: fixtureDataset.datasetHash };
 }
 
 function metricResult(
@@ -49,12 +64,14 @@ function metricResult(
 function run(
   observations: readonly ModelObservationStatus[],
   caseIds = ['case-1', 'case-2'],
+  identity = datasetIdentity,
 ): EvaluationRun {
   return {
     runId: 'run-fixture',
-    datasetIdentity,
+    datasetIdentity: identity,
     engineIdentity: { engineVersion: '1.0.0', engineCommit: 'fixture-commit', runtimeContract: 'fixture-runtime' },
     evaluationContractVersion: '6.5-b-fixture',
+    datasetRole: 'DESIGN',
     caseResults: observations.map((status, index) => ({
       caseId: caseIds[index],
       modelObservation: {
@@ -65,14 +82,17 @@ function run(
       metricResults: status === 'SUCCESS' ? [metricResult('SPEARMAN_RHO')] : [],
     })),
     runLevelMetricResults: [metricResult('MAE'), metricResult('RMSE', 'INSUFFICIENT_DATA')],
+    metricCoverage: [],
+    technicalContractViolations: [],
     executionTimestamp: '2026-09-13T00:00:00.000Z',
   };
 }
 
 function context(overrides: Partial<EvaluationReportContext> = {}): EvaluationReportContext {
+  const fixtureDataset = overrides.dataset ?? defaultDataset;
   return {
     reportId: 'report-fixture',
-    dataset: dataset(),
+    dataset: fixtureDataset,
     metricDefinitions: [
       MAE_METRIC_DEFINITION,
       RMSE_METRIC_DEFINITION,
@@ -81,7 +101,7 @@ function context(overrides: Partial<EvaluationReportContext> = {}): EvaluationRe
       DIRECTIONAL_ACCURACY_DEFINITION,
     ],
     referenceObservationStatuses: {
-      datasetIdentity,
+      datasetIdentity: identityOf(fixtureDataset),
       observations: [
         { caseId: 'case-1', targetId: 'joy', status: 'OBSERVED' },
         { caseId: 'case-2', targetId: 'joy', status: 'MISSING' },
@@ -116,6 +136,7 @@ describe('aggregateEvaluationReport', () => {
       invalidCount: 1,
     });
     expect(report.scientificProvenance.referenceType).toBe('SYNTHETIC_ORACLE');
+    expect(report.scientificProvenance.datasetRole).toBe('DESIGN');
     expect(report.run).toBeDefined();
     expect(report.counterexampleReferences).toBeUndefined();
   });
@@ -157,12 +178,12 @@ describe('aggregateEvaluationReport', () => {
   });
 
   it.each([
-    ['duplicate planned case IDs', dataset(['case-1', 'case-1']), run(['SUCCESS', 'SUCCESS']), 'DUPLICATE_PLANNED_CASE_ID'],
-    ['duplicate result case IDs', dataset(), run(['SUCCESS', 'SUCCESS'], ['case-1', 'case-1']), 'DUPLICATE_RESULT_CASE_ID'],
-    ['unexpected result case ID', dataset(), run(['SUCCESS', 'SUCCESS'], ['case-1', 'unexpected']), 'UNEXPECTED_RESULT_CASE_ID'],
-  ])('returns FAILED for %s', (_description, fixtureDataset, fixtureRun, technicalFailure) => {
+    ['duplicate planned case IDs', dataset(['case-1', 'case-1']), ['case-1', 'case-1'], 'DUPLICATE_PLANNED_CASE_ID'],
+    ['duplicate result case IDs', dataset(), ['case-1', 'case-1'], 'DUPLICATE_RESULT_CASE_ID'],
+    ['unexpected result case ID', dataset(), ['case-1', 'unexpected'], 'UNEXPECTED_RESULT_CASE_ID'],
+  ] as const)('returns FAILED for %s', (_description, fixtureDataset, resultCaseIds, technicalFailure) => {
     const report = aggregateEvaluationReport(
-      { kind: 'RUN_AVAILABLE', run: fixtureRun },
+      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS'], [...resultCaseIds], identityOf(fixtureDataset)) },
       context({ dataset: fixtureDataset }),
     );
 
@@ -173,13 +194,78 @@ describe('aggregateEvaluationReport', () => {
 
   it('classifies empty planned datasets with zero results as COMPLETE', () => {
     const emptyDataset = dataset([]);
-    const emptyRun = { ...run([], []), runLevelMetricResults: undefined };
+    const emptyRun = { ...run([], [], identityOf(emptyDataset)), runLevelMetricResults: undefined };
     const report = aggregateEvaluationReport(
       { kind: 'RUN_AVAILABLE', run: emptyRun },
-      context({ dataset: emptyDataset, referenceObservationStatuses: { datasetIdentity, observations: [] } }),
+      context({ dataset: emptyDataset, referenceObservationStatuses: { datasetIdentity: identityOf(emptyDataset), observations: [] } }),
     );
 
     expect(report.executionStatus).toBe('COMPLETE');
+  });
+
+  it('returns FAILED with DATASET_HASH_MISMATCH when the report dataset hash is not canonical (fatal, not a warning)', () => {
+    const tampered = { ...defaultDataset, datasetHash: 'tampered-hash' };
+    const report = aggregateEvaluationReport(
+      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS'], undefined, identityOf(tampered)) },
+      context({ dataset: tampered, referenceObservationStatuses: { datasetIdentity: identityOf(tampered), observations: [] } }),
+    );
+
+    expect(report.executionStatus).toBe('FAILED');
+    if (report.executionStatus !== 'FAILED') throw new Error('Expected failed report.');
+    expect(report.technicalFailure).toBe('DATASET_HASH_MISMATCH');
+    expect('run' in report).toBe(false);
+
+    const failedAttempt = aggregateEvaluationReport(
+      { kind: 'RUN_FAILED', failureReason: 'runner threw', attemptedDatasetIdentity: identityOf(tampered) },
+      context({ dataset: tampered }),
+    );
+    expect(failedAttempt.executionStatus === 'FAILED' && failedAttempt.technicalFailure).toBe('DATASET_HASH_MISMATCH');
+  });
+
+  it('changes the canonical hash when a case changes and is deterministic otherwise', () => {
+    const original = dataset(['case-1', 'case-2']);
+    const again = dataset(['case-1', 'case-2']);
+    const edited = dataset(['case-1', 'case-2'], fixtureCases(['case-1', 'case-2']).map((evaluationCase, index) => (
+      index === 1 ? { ...evaluationCase, referenceAnnotation: { annotationType: 'EXACT_VECTOR' as const, targetValues: { joy: 0.6 } } } : evaluationCase
+    )));
+
+    expect(original.datasetHash).toBe(again.datasetHash);
+    expect(edited.datasetHash).not.toBe(original.datasetHash);
+  });
+
+  it('preserves heterogeneous annotator counts and agreements per case instead of collapsing them', () => {
+    const humanCases = fixtureCases(['case-1', 'case-2', 'case-3']).map((evaluationCase, index) => ({
+      ...evaluationCase,
+      referenceAnnotation: {
+        ...evaluationCase.referenceAnnotation,
+        ...(index < 2 ? { annotatorCount: index === 0 ? 3 : 5 } : {}),
+        ...(index === 1 ? { interRaterAgreement: 0.7 } : {}),
+      },
+    }));
+    const humanDataset = { ...dataset(['case-1', 'case-2', 'case-3'], humanCases), referenceType: 'HUMAN_ANNOTATED' as const };
+    const withHash = { ...humanDataset, datasetHash: computeDatasetHash(humanDataset) };
+    const report = aggregateEvaluationReport(
+      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS', 'SUCCESS'], ['case-1', 'case-2', 'case-3'], identityOf(withHash)) },
+      context({ dataset: withHash, referenceObservationStatuses: { datasetIdentity: identityOf(withHash), observations: [] } }),
+    );
+
+    expect(report.scientificProvenance.annotationProvenance).toBe('DEFERRED');
+    expect(report.scientificProvenance.annotatorCountsByCase).toEqual([
+      { caseId: 'case-1', value: 3 },
+      { caseId: 'case-2', value: 5 },
+    ]);
+    expect(report.scientificProvenance.interRaterAgreementsByCase).toEqual([{ caseId: 'case-2', value: 0.7 }]);
+  });
+
+  it('preserves HELD_OUT role and held-out parameter versions in scientific provenance', () => {
+    const heldOut = { ...defaultDataset, role: 'HELD_OUT' as const, heldOutParameterVersionIds: ['pv-7'] };
+    const report = aggregateEvaluationReport(
+      { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS']), datasetRole: 'HELD_OUT', heldOutParameterVersionIds: ['pv-7'] } },
+      context({ dataset: heldOut }),
+    );
+
+    expect(report.scientificProvenance.datasetRole).toBe('HELD_OUT');
+    expect(report.scientificProvenance.heldOutParameterVersionIds).toEqual(['pv-7']);
   });
 
   it('returns FAILED for run or reference-status dataset identity mismatch', () => {
@@ -216,11 +302,12 @@ describe('aggregateEvaluationReport', () => {
   });
 
   it('keeps SUCCESS, FAILED, INVALID_OUTPUT, and NOT_EXECUTED distinct from reference missingness', () => {
+    const fourCases = dataset(['case-1', 'case-2', 'case-3', 'case-4']);
     const report = aggregateEvaluationReport(
-      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'FAILED', 'INVALID_OUTPUT', 'NOT_EXECUTED'], ['case-1', 'case-2', 'case-3', 'case-4']) },
+      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'FAILED', 'INVALID_OUTPUT', 'NOT_EXECUTED'], ['case-1', 'case-2', 'case-3', 'case-4'], identityOf(fourCases)) },
       context({
-        dataset: dataset(['case-1', 'case-2', 'case-3', 'case-4']),
-        referenceObservationStatuses: { datasetIdentity, observations: [{ caseId: 'case-1', targetId: 'joy', status: 'MISSING' }] },
+        dataset: fourCases,
+        referenceObservationStatuses: { datasetIdentity: identityOf(fourCases), observations: [{ caseId: 'case-1', targetId: 'joy', status: 'MISSING' }] },
       }),
     );
 
@@ -237,17 +324,18 @@ describe('aggregateEvaluationReport', () => {
   });
 
   it('summarizes explicitly supplied definitions while preserving metrics levels and methodology states', () => {
-    const fixtureDataset = dataset().cases.map((evaluationCase, index) => (
+    const mixedCases = fixtureCases(['case-1', 'case-2']).map((evaluationCase, index) => (
       index === 1
         ? {
             ...evaluationCase,
-            referenceAnnotation: { annotationType: 'RANKING' as const, targetValues: { joy: 2, fear: 1 } },
+            referenceAnnotation: { annotationType: 'RANKING' as const, targetValues: { joy: 1, fear: 2 } },
           }
         : evaluationCase
     ));
+    const mixedDataset = dataset(['case-1', 'case-2'], mixedCases);
     const report = aggregateEvaluationReport(
-      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS']) },
-      context({ dataset: { ...dataset(), cases: fixtureDataset } }),
+      { kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS'], undefined, identityOf(mixedDataset)) },
+      context({ dataset: mixedDataset }),
     );
 
     if (report.executionStatus === 'FAILED') throw new Error('Expected run report.');

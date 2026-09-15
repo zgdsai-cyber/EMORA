@@ -9,6 +9,7 @@ import {
   calculateVectorMAE,
   calculateVectorRMSE,
   computeFractionalRanks,
+  isValidCompetitionRanking,
 } from './calculations';
 import {
   DIRECTIONAL_ACCURACY_DEFINITION,
@@ -28,6 +29,22 @@ describe('L2-A metric definitions', () => {
 
     expect(Object.isFrozen(MAE_METRIC_DEFINITION.assumptions)).toBe(true);
     expect(Object.isFrozen(SPEARMAN_METRIC_DEFINITION.assumptions)).toBe(true);
+  });
+
+  // MDS v1.0 §7 — error metrics are non-negative statistics, not BOUNDED_0_1.
+  it('declares MAE/RMSE as non-negative error statistics and keeps correlation/proportion scales separate', () => {
+    expect(MAE_METRIC_DEFINITION.scale).toBe('ERROR_NON_NEGATIVE');
+    expect(RMSE_METRIC_DEFINITION.scale).toBe('ERROR_NON_NEGATIVE');
+    expect(SPEARMAN_METRIC_DEFINITION.scale).toBe('BOUNDED_MINUS1_1');
+    expect(PEARSON_METRIC_DEFINITION.scale).toBe('BOUNDED_MINUS1_1');
+    expect(DIRECTIONAL_ACCURACY_DEFINITION.scale).toBe('BOUNDED_0_1');
+  });
+
+  it('declares the MDS ranking protocol in the Spearman definition', () => {
+    expect(SPEARMAN_METRIC_DEFINITION.assumptions.some((assumption) => assumption.includes('RANK_1_IS_HIGHEST'))).toBe(true);
+    expect(SPEARMAN_METRIC_DEFINITION.assumptions.some((assumption) => assumption.includes('EMOTION only'))).toBe(true);
+    expect(SPEARMAN_METRIC_DEFINITION.assumptions.some((assumption) => assumption.includes('competition ranks'))).toBe(true);
+    expect(SPEARMAN_METRIC_DEFINITION.assumptions.some((assumption) => assumption.includes('average ranks'))).toBe(true);
   });
 });
 
@@ -155,6 +172,24 @@ describe('L2-A pure metric calculations - Fractional Ranks & Spearman', () => {
   it('returns INVALID when all values are tied (zero rank variance)', () => {
     const result = calculateSpearman([0.5, 0.5, 0.5], [0.1, 0.2, 0.3]);
     expect(result.status).toBe('INVALID');
+  });
+});
+
+describe('competition-rank validation (MDS v1.0 §6.2, A1)', () => {
+  it.each([[[1]], [[1, 2, 3]], [[1, 1, 3]], [[1, 2, 2]], [[1, 1, 3, 4]], [[1, 2, 2, 4]], [[1, 2, 2, 2]], [[1, 2, 2, 2, 5]], [[3, 1, 1]]])(
+    'accepts %j', (ranks) => { expect(isValidCompetitionRanking(ranks)).toBe(true); },
+  );
+
+  it.each([[[]], [[1, 1, 2]], [[1, 2, 2, 3]], [[2, 2, 3]], [[1, 1, 4]], [[1, 1, 4, 4]], [[0, 1, 2]], [[1, 2, 3, 5]], [[1.5, 1.5, 3]], [[1, Number.NaN]]])(
+    'rejects %j', (ranks) => { expect(isValidCompetitionRanking(ranks as number[])).toBe(false); },
+  );
+
+  it('does not mutate its input and is deterministic', () => {
+    const ranks = [3, 1, 1];
+    expect(isValidCompetitionRanking(ranks)).toBe(true);
+    expect(ranks).toEqual([3, 1, 1]);
+    expect(computeFractionalRanks([1, 1, 3])).toEqual([1.5, 1.5, 3]);
+    expect(computeFractionalRanks([1, 1, 3])).toEqual(computeFractionalRanks([1, 1, 3]));
   });
 });
 

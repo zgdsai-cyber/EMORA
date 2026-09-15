@@ -2,6 +2,8 @@ export * from './canonicalize';
 export * from './contracts';
 export * from './gates';
 export * from './runner';
+export * from './dimensions/registry';
+export * from './dataset/identity';
 export * from './metrics/definitions';
 export * from './metrics/calculations';
 export * from './execution/runner';
