@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { hashCanonical } from '../canonicalize';
 import type { EvaluationCase } from '../contracts';
-import { computeDatasetHash, EvaluationContractViolationError, verifyDatasetHash } from './identity';
+import { computeDatasetHash, checkDatasetIntegrity, EvaluationContractViolationError, verifyDatasetHash } from './identity';
 
 const cases: EvaluationCase[] = [
   { caseId: 'c-1', datasetId: 'd', input: { a: 1 }, referenceAnnotation: { annotationType: 'EXACT_VECTOR', targetValues: { joy: 0.5 } } },
@@ -51,5 +51,34 @@ describe('dataset identity (MDS v1.0 §13)', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe('EvaluationContractViolationError');
     expect(error.violation).toBe('DATASET_HASH_MISMATCH');
+  });
+});
+
+describe('checkDatasetIntegrity (Phase 6.7)', () => {
+  const base = { datasetId: 'd', casesCount: 1, cases, role: 'DESIGN' as const, heldOutParameterVersionIds: undefined };
+
+  it('passes when casesCount matches and no held-out rule applies', () => {
+    expect(checkDatasetIntegrity(base, 'pv-1')).toBeUndefined();
+    expect(checkDatasetIntegrity(base, undefined)).toBeUndefined();
+  });
+
+  it('reports CASES_COUNT_MISMATCH without repairing the value', () => {
+    const failure = checkDatasetIntegrity({ ...base, casesCount: 2 }, undefined);
+    expect(failure?.violation).toBe('CASES_COUNT_MISMATCH');
+    expect(failure?.message).toContain('casesCount=2');
+  });
+
+  it('applies the held-out rule only to HELD_OUT datasets that declare a list and receive a parameter version', () => {
+    const heldOut = { ...base, role: 'HELD_OUT' as const, heldOutParameterVersionIds: ['pv-1', 'pv-2'] };
+    expect(checkDatasetIntegrity(heldOut, 'pv-2')).toBeUndefined();
+    expect(checkDatasetIntegrity(heldOut, 'pv-9')?.violation).toBe('HELD_OUT_PARAMETER_VERSION_MISMATCH');
+    expect(checkDatasetIntegrity(heldOut, undefined)).toBeUndefined();
+    expect(checkDatasetIntegrity({ ...heldOut, heldOutParameterVersionIds: undefined }, 'pv-9')).toBeUndefined();
+    expect(checkDatasetIntegrity({ ...heldOut, role: 'DESIGN' }, 'pv-9')).toBeUndefined();
+  });
+
+  it('checks casesCount before the held-out rule', () => {
+    const failure = checkDatasetIntegrity({ ...base, casesCount: 0, role: 'HELD_OUT', heldOutParameterVersionIds: ['pv-1'] }, 'pv-9');
+    expect(failure?.violation).toBe('CASES_COUNT_MISMATCH');
   });
 });

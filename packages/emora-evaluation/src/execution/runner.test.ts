@@ -4,6 +4,7 @@ import type { StateTransitionProvider } from '@emora/emotional-core';
 
 import type { EvaluationDataset, EvaluationRequest } from '../contracts';
 import { computeDatasetHash, EvaluationContractViolationError } from '../dataset/identity';
+import { computeEvaluationContractHash } from '../contract-hash';
 import { MAE_METRIC_DEFINITION, RMSE_METRIC_DEFINITION, SPEARMAN_METRIC_DEFINITION } from '../metrics/definitions';
 import { aggregateEvaluationReport } from '../report/aggregator';
 import { runBehavioralEvaluation } from './runner';
@@ -446,6 +447,25 @@ describe('runBehavioralEvaluation', () => {
     expect((run.runLevelMetricResults ?? []).every((result) => result.missingCasesCount === 0)).toBe(true);
   });
 
+  // Phase 6.7 — MetricCoverage is authoritative; the legacy scalar cannot redefine coverage.
+  it('keeps MetricCoverage authoritative: excluded counts come from coverage, never from missingCasesCount', () => {
+    const run = runBehavioralEvaluation(
+      request([exactCase('case-fail', 0.6, 0.2), exactCase('case-ok', 0.6, 0.2), exactCase('case-ok-2', 0.4, 0.4)], (input) => {
+        if ((input as unknown as { caseId: string }).caseId === 'case-fail') throw new Error('boom');
+        return validResult(0.6, 0.2) as never;
+      }),
+      executionMetadata,
+    );
+
+    const joy = coverageFor(run, 'MAE', 'joy');
+    expect(joy).toMatchObject({ planned: 3, eligible: 2, contributing: 2, excluded: 1 });
+    expect(joy?.planned).toBe((joy?.contributing ?? 0) + (joy?.excluded ?? 0));
+    const mae = (run.runLevelMetricResults ?? []).find((result) => result.metricId === 'MAE' && result.dimension === 'joy');
+    expect(mae?.sampleSize).toBe(2);
+    expect(mae?.missingCasesCount).toBe(0);
+    expect(mae?.missingCasesCount).not.toBe(joy?.excluded);
+  });
+
   // Review Point D — both hash-mismatch paths: runner throws before any run exists; a RUN_FAILED attempt reaches the aggregator as FAILED.
   it('propagates a runner DATASET_HASH_MISMATCH through a RUN_FAILED attempt to a FAILED report', () => {
     const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { datasetHash: 'not-the-canonical-hash' });
@@ -675,13 +695,73 @@ describe('runBehavioralEvaluation', () => {
   // MDS §12 — HELD_OUT provenance is preserved verbatim.
   it('preserves HELD_OUT role and held-out parameter versions', () => {
     const run = runBehavioralEvaluation(
-      request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'HELD_OUT', heldOutParameterVersionIds: ['pv-1', 'pv-2'] }),
+      request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'HELD_OUT', heldOutParameterVersionIds: ['pv-1', 'pv-2', 'opaque-parameter-version'] }),
       executionMetadata,
     );
 
     expect(run.datasetRole).toBe('HELD_OUT');
-    expect(run.heldOutParameterVersionIds).toEqual(['pv-1', 'pv-2']);
+    expect(run.heldOutParameterVersionIds).toEqual(['pv-1', 'pv-2', 'opaque-parameter-version']);
     expect(Object.isFrozen(run.heldOutParameterVersionIds)).toBe(true);
+  });
+
+  // Phase 6.7 — technical provenance.
+  describe('technical provenance (Phase 6.7)', () => {
+    it('records the deterministic evaluation contract hash, independent of timestamp and results', () => {
+      const first = runBehavioralEvaluation(request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never), executionMetadata);
+      const laterTimestamp = runBehavioralEvaluation(request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never), { ...executionMetadata, executionTimestamp: '2030-01-01T00:00:00.000Z' });
+      const differentResults = runBehavioralEvaluation(request([exactCase('case-1', 0.1, 0.9)], () => validResult(0.9, 0.1) as never), executionMetadata);
+
+      expect(first.evaluationContractHash).toBe(computeEvaluationContractHash());
+      expect(laterTimestamp.evaluationContractHash).toBe(first.evaluationContractHash);
+      expect(differentResults.evaluationContractHash).toBe(first.evaluationContractHash);
+    });
+
+    it('preserves caller-supplied toolchainIdentity exactly and never invents one', () => {
+      const base = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never);
+      const withToolchain = runBehavioralEvaluation({ ...base, toolchainIdentity: 'node@24.14.0 pnpm@10 lock:abc123' }, executionMetadata);
+      const without = runBehavioralEvaluation(base, executionMetadata);
+      expect(withToolchain.toolchainIdentity).toBe('node@24.14.0 pnpm@10 lock:abc123');
+      expect(without.toolchainIdentity).toBeUndefined();
+    });
+  });
+
+  // Phase 6.7 — dataset integrity (technical, not leakage detection).
+  describe('dataset integrity (Phase 6.7)', () => {
+    function violationOf(fn: () => unknown) {
+      try { fn(); } catch (error) { return (error as EvaluationContractViolationError).violation; }
+      return undefined;
+    }
+
+    it('accepts casesCount === cases.length', () => {
+      const run = runBehavioralEvaluation(request([exactCase('case-1', 0.7, 0.2), exactCase('case-2', 0.5, 0.5)], () => validResult(0.7, 0.2) as never), executionMetadata);
+      expect(run.caseResults).toHaveLength(2);
+    });
+
+    it('throws CASES_COUNT_MISMATCH when casesCount disagrees with cases.length', () => {
+      const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { casesCount: 3 });
+      expect(violationOf(() => runBehavioralEvaluation(evaluationRequest, executionMetadata))).toBe('CASES_COUNT_MISMATCH');
+    });
+
+    it('accepts a HELD_OUT dataset when the evaluated parameter version is declared held out', () => {
+      const run = runBehavioralEvaluation(
+        request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'HELD_OUT', heldOutParameterVersionIds: ['opaque-parameter-version'] }),
+        executionMetadata,
+      );
+      expect(run.datasetRole).toBe('HELD_OUT');
+    });
+
+    it('throws HELD_OUT_PARAMETER_VERSION_MISMATCH when the evaluated parameter version is not declared held out', () => {
+      const evaluationRequest = request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'HELD_OUT', heldOutParameterVersionIds: ['pv-other'] });
+      expect(violationOf(() => runBehavioralEvaluation(evaluationRequest, executionMetadata))).toBe('HELD_OUT_PARAMETER_VERSION_MISMATCH');
+    });
+
+    it('does not apply HELD_OUT parameter-version validation to DESIGN datasets', () => {
+      const run = runBehavioralEvaluation(
+        request([exactCase('case-1', 0.7, 0.2)], () => validResult(0.7, 0.2) as never, { role: 'DESIGN', heldOutParameterVersionIds: ['pv-other'] }),
+        executionMetadata,
+      );
+      expect(run.datasetRole).toBe('DESIGN');
+    });
   });
 
   // MDS §23 — determinism of the changed paths (coverage, violations, ranking).

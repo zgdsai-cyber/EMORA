@@ -9,6 +9,7 @@ import type {
   ModelObservationStatus,
 } from '../contracts';
 import { computeDatasetHash } from '../dataset/identity';
+import { computeEvaluationContractHash } from '../contract-hash';
 import {
   DIRECTIONAL_ACCURACY_DEFINITION,
   MAE_METRIC_DEFINITION,
@@ -71,6 +72,7 @@ function run(
     datasetIdentity: identity,
     engineIdentity: { engineVersion: '1.0.0', engineCommit: 'fixture-commit', runtimeContract: 'fixture-runtime' },
     evaluationContractVersion: '6.5-b-fixture',
+    evaluationContractHash: computeEvaluationContractHash(),
     datasetRole: 'DESIGN',
     caseResults: observations.map((status, index) => ({
       caseId: caseIds[index],
@@ -260,12 +262,117 @@ describe('aggregateEvaluationReport', () => {
   it('preserves HELD_OUT role and held-out parameter versions in scientific provenance', () => {
     const heldOut = { ...defaultDataset, role: 'HELD_OUT' as const, heldOutParameterVersionIds: ['pv-7'] };
     const report = aggregateEvaluationReport(
-      { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS']), datasetRole: 'HELD_OUT', heldOutParameterVersionIds: ['pv-7'] } },
+      { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS']), datasetRole: 'HELD_OUT', heldOutParameterVersionIds: ['pv-7'], parameterVersionId: 'pv-7' } },
       context({ dataset: heldOut }),
     );
 
     expect(report.scientificProvenance.datasetRole).toBe('HELD_OUT');
     expect(report.scientificProvenance.heldOutParameterVersionIds).toEqual(['pv-7']);
+  });
+
+  // Phase 6.7 — descriptive evidence level from referenceType × datasetRole only.
+  describe('evidence level (Phase 6.7)', () => {
+    function withReference(referenceType: EvaluationDataset['referenceType'], role: EvaluationDataset['role'] = 'DESIGN', heldOutParameterVersionIds?: string[]) {
+      const base = { ...defaultDataset, referenceType, role, heldOutParameterVersionIds };
+      return { ...base, datasetHash: computeDatasetHash(base) };
+    }
+    function reportFor(fixtureDataset: EvaluationDataset, observations: ModelObservationStatus[] = ['SUCCESS', 'SUCCESS'], parameterVersionId?: string) {
+      return aggregateEvaluationReport(
+        { kind: 'RUN_AVAILABLE', run: { ...run(observations, undefined, identityOf(fixtureDataset)), datasetRole: fixtureDataset.role, parameterVersionId } },
+        context({ dataset: fixtureDataset, referenceObservationStatuses: { datasetIdentity: identityOf(fixtureDataset), observations: [] } }),
+      );
+    }
+
+    it.each([
+      ['SYNTHETIC_ORACLE', 'L2_SYNTHETIC'],
+      ['EXPERT_DESIGN', 'L2_REFERENCE'],
+      ['BASELINE_AGREEMENT', 'L2_REFERENCE'],
+      ['HUMAN_ANNOTATED', 'L2_HUMAN_NOT_HELD_OUT'],
+    ] as const)('classifies %s on a DESIGN dataset as %s', (referenceType, expected) => {
+      expect(reportFor(withReference(referenceType)).scientificProvenance.evidenceLevel).toBe(expected);
+    });
+
+    it('never emits L3: HUMAN_ANNOTATED + HELD_OUT is left unclassified', () => {
+      const report = reportFor(withReference('HUMAN_ANNOTATED', 'HELD_OUT', ['pv-1']), ['SUCCESS', 'SUCCESS'], 'pv-1');
+      expect(report.executionStatus).toBe('COMPLETE');
+      expect(report.scientificProvenance.evidenceLevel).toBeUndefined();
+      expect(JSON.stringify(report)).not.toMatch(/"L3/);
+      expect(report.scientificSupportLabels).toBeUndefined();
+    });
+
+    it('does not change the evidence level based on execution results or metric values', () => {
+      const dataset = withReference('SYNTHETIC_ORACLE');
+      const allSuccess = reportFor(dataset, ['SUCCESS', 'SUCCESS']);
+      const allFailed = reportFor(dataset, ['FAILED', 'INVALID_OUTPUT']);
+      const partial = reportFor(dataset, ['SUCCESS', 'NOT_EXECUTED']);
+      expect(allSuccess.scientificProvenance.evidenceLevel).toBe('L2_SYNTHETIC');
+      expect(allFailed.scientificProvenance.evidenceLevel).toBe('L2_SYNTHETIC');
+      expect(partial.scientificProvenance.evidenceLevel).toBe('L2_SYNTHETIC');
+      expect(partial.executionStatus).toBe('PARTIAL');
+    });
+
+    it('is present on FAILED reports too, derived from the same metadata', () => {
+      const report = aggregateEvaluationReport(
+        { kind: 'RUN_FAILED', failureReason: 'runner threw', attemptedDatasetIdentity: datasetIdentity },
+        context(),
+      );
+      expect(report.scientificProvenance.evidenceLevel).toBe('L2_SYNTHETIC');
+    });
+  });
+
+  // Phase 6.7 — contract hash and dataset integrity in the report layer.
+  describe('technical provenance and dataset integrity (Phase 6.7)', () => {
+    it('records the deterministic evaluation contract hash on every report shape', () => {
+      const complete = aggregateEvaluationReport({ kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS']) }, context());
+      const failed = aggregateEvaluationReport({ kind: 'RUN_FAILED', failureReason: 'x', attemptedDatasetIdentity: datasetIdentity }, context());
+      expect(complete.evaluationContractHash).toBe(computeEvaluationContractHash());
+      expect(failed.evaluationContractHash).toBe(computeEvaluationContractHash());
+      expect(complete.evaluationContractHash).toMatch(/^[0-9a-f]{64}$/);
+      if (complete.executionStatus !== 'FAILED') {
+        expect(complete.run.evaluationContractHash).toBe(complete.evaluationContractHash);
+      }
+    });
+
+    it('returns FAILED with EVALUATION_CONTRACT_HASH_MISMATCH when the run was produced under a different frozen contract', () => {
+      const report = aggregateEvaluationReport(
+        { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS']), evaluationContractHash: 'f'.repeat(64) } },
+        context(),
+      );
+      expect(report.executionStatus).toBe('FAILED');
+      if (report.executionStatus !== 'FAILED') throw new Error('Expected failed report.');
+      expect(report.technicalFailure).toBe('EVALUATION_CONTRACT_HASH_MISMATCH');
+      expect('run' in report).toBe(false);
+      expect(report.evaluationContractHash).toBe(computeEvaluationContractHash());
+    });
+
+    it('returns FAILED with CASES_COUNT_MISMATCH when casesCount disagrees with cases.length', () => {
+      const mismatched = { ...defaultDataset, casesCount: 5 };
+      const report = aggregateEvaluationReport({ kind: 'RUN_AVAILABLE', run: run(['SUCCESS', 'SUCCESS']) }, context({ dataset: mismatched }));
+      expect(report.executionStatus).toBe('FAILED');
+      if (report.executionStatus !== 'FAILED') throw new Error('Expected failed report.');
+      expect(report.technicalFailure).toBe('CASES_COUNT_MISMATCH');
+      expect('run' in report).toBe(false);
+    });
+
+    it('returns FAILED with HELD_OUT_PARAMETER_VERSION_MISMATCH when the run parameter version is not declared held out', () => {
+      const base = { ...defaultDataset, role: 'HELD_OUT' as const, heldOutParameterVersionIds: ['pv-1'] };
+      const heldOut = { ...base, datasetHash: computeDatasetHash(base) };
+      const report = aggregateEvaluationReport(
+        { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS'], undefined, identityOf(heldOut)), datasetRole: 'HELD_OUT', parameterVersionId: 'pv-9' } },
+        context({ dataset: heldOut, referenceObservationStatuses: { datasetIdentity: identityOf(heldOut), observations: [] } }),
+      );
+      expect(report.executionStatus).toBe('FAILED');
+      if (report.executionStatus !== 'FAILED') throw new Error('Expected failed report.');
+      expect(report.technicalFailure).toBe('HELD_OUT_PARAMETER_VERSION_MISMATCH');
+    });
+
+    it('does not apply HELD_OUT parameter-version validation to DESIGN datasets', () => {
+      const report = aggregateEvaluationReport(
+        { kind: 'RUN_AVAILABLE', run: { ...run(['SUCCESS', 'SUCCESS']), parameterVersionId: 'pv-anything' } },
+        context(),
+      );
+      expect(report.executionStatus).toBe('COMPLETE');
+    });
   });
 
   it('returns FAILED for run or reference-status dataset identity mismatch', () => {

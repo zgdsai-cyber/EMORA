@@ -68,5 +68,6 @@ export function runL1Evaluation(options: L1EvaluationOptions): L1EvaluationRepor
     outputCanonical,
     reportHash: hashCanonical({ identity, outputCanonical, results }),
     results: Object.freeze(results),
+    evidenceLevel: 'L1_STRUCTURAL',
   });
 }

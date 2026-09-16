@@ -6,7 +6,8 @@ import {
 } from '../metrics/calculations';
 import { SPEARMAN_METRIC_DEFINITION } from '../metrics/definitions';
 import { classifyDimension, SPEARMAN_RANKING_PROTOCOL } from '../dimensions/registry';
-import { EvaluationContractViolationError, verifyDatasetHash } from '../dataset/identity';
+import { checkDatasetIntegrity, EvaluationContractViolationError, verifyDatasetHash } from '../dataset/identity';
+import { computeEvaluationContractHash } from '../contract-hash';
 import type {
   CoverageExclusion,
   CoverageExclusionReason,
@@ -328,6 +329,10 @@ export function runBehavioralEvaluation(
       `Dataset ${request.dataset.datasetId}@${request.dataset.datasetVersion} hash does not match its canonical identity.`,
     );
   }
+  const integrity = checkDatasetIntegrity(request.dataset, request.parameterVersionId);
+  if (integrity) {
+    throw new EvaluationContractViolationError(integrity.violation, integrity.message);
+  }
 
   const observations = request.dataset.cases.map((evaluationCase) =>
     observe(evaluationCase, request, metadata.executionTimestamp));
@@ -362,7 +367,9 @@ export function runBehavioralEvaluation(
     parameterVersionId: request.parameterVersionId,
     parameterVersionHash: request.parameterVersionHash,
     evaluationContractVersion: request.evaluationContractVersion,
+    evaluationContractHash: computeEvaluationContractHash(),
     configurationHash: request.configurationHash,
+    toolchainIdentity: request.toolchainIdentity,
     datasetRole: request.dataset.role,
     heldOutParameterVersionIds: request.dataset.heldOutParameterVersionIds
       ? Object.freeze([...request.dataset.heldOutParameterVersionIds])

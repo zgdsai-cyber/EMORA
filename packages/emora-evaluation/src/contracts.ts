@@ -42,6 +42,12 @@ export interface L1EvaluationReport {
   readonly outputCanonical: string;
   readonly reportHash: string;
   readonly results: readonly GateResult[];
+  /**
+   * Descriptive only; L1 gates are structural/mathematical evidence (Phase 6.7).
+   * Constant for every L1 report, so it carries no identity and is intentionally
+   * outside the reportHash inputs.
+   */
+  readonly evidenceLevel: 'L1_STRUCTURAL';
 }
 
 export interface L1EvaluationCase {
@@ -263,6 +269,8 @@ export interface EvaluationRequest {
   readonly parameterVersionHash?: string;
   readonly evaluationContractVersion: string;
   readonly configurationHash?: string;
+  /** Caller-supplied toolchain identity (e.g. node/pnpm versions); never discovered or hashed by the evaluation layer. */
+  readonly toolchainIdentity?: string;
 }
 
 export interface EvaluationCaseResult {
@@ -286,7 +294,10 @@ export interface EvaluationRun {
   readonly parameterVersionId?: string;
   readonly parameterVersionHash?: string;
   readonly evaluationContractVersion: string;
+  /** Deterministic hash of the frozen evaluation contract (metric definitions, ranking protocol, dimension registry); see computeEvaluationContractHash. */
+  readonly evaluationContractHash: string;
   readonly configurationHash?: string;
+  readonly toolchainIdentity?: string;
   readonly datasetRole: DatasetRole;
   readonly heldOutParameterVersionIds?: readonly string[];
   readonly caseResults: readonly EvaluationCaseResult[];
@@ -367,6 +378,25 @@ export interface MetricStatusSummary {
 }
 
 /**
+ * Descriptive evidence-level classification derived ONLY from reference type and
+ * dataset role (Phase 6.7). It is not psychological validity, model quality, a
+ * score, an inference, or a ScientificSupportLabel. No L3 value exists: the MDS L3
+ * preconditions are deferred, so a HUMAN_ANNOTATED + HELD_OUT dataset is left
+ * unclassified (undefined) rather than assigned a level.
+ */
+export type EvaluationEvidenceLevel =
+  | 'L1_STRUCTURAL'
+  | 'L2_SYNTHETIC'
+  | 'L2_REFERENCE'
+  | 'L2_HUMAN_NOT_HELD_OUT';
+
+/** Supplied per-case scalar preserved verbatim; heterogeneity is never collapsed (MDS v1.0 §10.2). */
+export interface CaseScalarProvenance {
+  readonly caseId: string;
+  readonly value: number;
+}
+
+/**
  * Scientific evidence provenance, distinct from the technical reproducibility
  * fields already present on EvaluationRun (datasetIdentity, engineIdentity,
  * parameterVersionId/Hash, evaluationContractVersion, configurationHash,
@@ -376,16 +406,12 @@ export interface MetricStatusSummary {
  * (HUMAN_ANNOTATED); none of these values constitutes universal or
  * psychological ground truth.
  */
-/** Supplied per-case scalar preserved verbatim; heterogeneity is never collapsed (MDS v1.0 §10.2). */
-export interface CaseScalarProvenance {
-  readonly caseId: string;
-  readonly value: number;
-}
-
 export interface ScientificEvidenceProvenance {
   readonly referenceType: ReferenceType;
   readonly datasetRole: DatasetRole;
   readonly heldOutParameterVersionIds?: readonly string[];
+  /** Undefined when the metadata cannot be classified without deferred L3 methodology. */
+  readonly evidenceLevel?: EvaluationEvidenceLevel;
   /** DEFERRED until human annotation-collection protocols are approved. */
   readonly annotationProvenance?: 'DEFERRED';
   readonly annotatorCountsByCase: readonly CaseScalarProvenance[];
@@ -443,6 +469,9 @@ export type TechnicalContractViolation =
   | 'UNEXPECTED_RESULT_CASE_ID'
   | 'DATASET_IDENTITY_MISMATCH'
   | 'DATASET_HASH_MISMATCH'
+  | 'EVALUATION_CONTRACT_HASH_MISMATCH'
+  | 'CASES_COUNT_MISMATCH'
+  | 'HELD_OUT_PARAMETER_VERSION_MISMATCH'
   | 'REFERENCE_STATUS_DATASET_IDENTITY_MISMATCH'
   | 'UNKNOWN_DIMENSION'
   | 'MIXED_SEMANTIC_SPACE';
@@ -488,6 +517,8 @@ export type EvaluationReportInput =
  */
 interface EvaluationReportBase {
   readonly reportId: string;
+  /** Same deterministic contract hash the runner records on EvaluationRun. */
+  readonly evaluationContractHash: string;
   readonly scientificProvenance: ScientificEvidenceProvenance;
   readonly deferredMethodologicalNotes: readonly string[];
   readonly counterexampleReferences?: readonly EvaluationCounterexampleReference[];

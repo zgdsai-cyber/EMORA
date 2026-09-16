@@ -114,6 +114,8 @@ describe('L1 provider observation', () => {
     expect(report.results.map((result) => result.gateId)).toEqual(['G1', 'G2', 'G3', 'G7']);
     expect(report.results.every((result) => result.status === 'PASS')).toBe(true);
     expect(report.reportHash).toMatch(/^[a-f0-9]{64}$/);
+    // Phase 6.7: L1 reports carry the descriptive structural evidence level; it is outside the report hash inputs.
+    expect(report.evidenceLevel).toBe('L1_STRUCTURAL');
   });
 
   it('reports invalid input bounds and does not fabricate a result', () => {

@@ -13,7 +13,9 @@ import type {
   ScientificEvidenceProvenance,
   TechnicalContractViolation,
 } from '../contracts';
-import { verifyDatasetHash } from '../dataset/identity';
+import { checkDatasetIntegrity, verifyDatasetHash } from '../dataset/identity';
+import { computeEvaluationContractHash } from '../contract-hash';
+import { classifyEvidenceLevel } from './evidence-level';
 
 function sameDatasetIdentity(
   left: { readonly datasetId: string; readonly datasetVersion: string; readonly datasetHash: string },
@@ -41,6 +43,7 @@ function scientificProvenance(context: EvaluationReportContext): ScientificEvide
     heldOutParameterVersionIds: context.dataset.heldOutParameterVersionIds
       ? Object.freeze([...context.dataset.heldOutParameterVersionIds])
       : undefined,
+    evidenceLevel: classifyEvidenceLevel({ kind: 'L2', referenceType: context.dataset.referenceType, datasetRole: context.dataset.role }),
     annotationProvenance: context.dataset.referenceType === 'HUMAN_ANNOTATED' ? 'DEFERRED' : undefined,
     annotatorCountsByCase: suppliedPerCase(context, (annotation) => annotation.annotatorCount),
     interRaterAgreementsByCase: suppliedPerCase(context, (annotation) => annotation.interRaterAgreement),
@@ -147,6 +150,7 @@ function reportFailure(
 ): EvaluationReport {
   return Object.freeze({
     reportId: context.reportId,
+    evaluationContractHash: computeEvaluationContractHash(),
     executionStatus: 'FAILED',
     failureReason,
     attemptedDatasetIdentity,
@@ -182,6 +186,10 @@ export function aggregateEvaluationReport(
   if (!verifyDatasetHash(context.dataset)) {
     return reportFailure(context, contextIdentity, 'Report dataset hash does not match its canonical identity.', 'DATASET_HASH_MISMATCH');
   }
+  const countIntegrity = checkDatasetIntegrity(context.dataset, undefined);
+  if (countIntegrity) {
+    return reportFailure(context, contextIdentity, countIntegrity.message, countIntegrity.violation);
+  }
 
   if (input.kind === 'RUN_FAILED') {
     if (!sameDatasetIdentity(input.attemptedDatasetIdentity, context.dataset)) {
@@ -202,8 +210,16 @@ export function aggregateEvaluationReport(
   if (!sameDatasetIdentity(run.datasetIdentity, context.dataset)) {
     return reportFailure(context, run.datasetIdentity, 'EvaluationRun dataset identity does not match the report dataset.', 'DATASET_IDENTITY_MISMATCH');
   }
+  // The run must have been produced under the same frozen evaluation contract the report describes.
+  if (run.evaluationContractHash !== computeEvaluationContractHash()) {
+    return reportFailure(context, run.datasetIdentity, 'EvaluationRun evaluation contract hash does not match the current frozen evaluation contract.', 'EVALUATION_CONTRACT_HASH_MISMATCH');
+  }
   if (!sameDatasetIdentity(context.referenceObservationStatuses.datasetIdentity, context.dataset)) {
     return reportFailure(context, run.datasetIdentity, 'Reference observation statuses do not match the report dataset.', 'REFERENCE_STATUS_DATASET_IDENTITY_MISMATCH');
+  }
+  const heldOutIntegrity = checkDatasetIntegrity(context.dataset, run.parameterVersionId);
+  if (heldOutIntegrity) {
+    return reportFailure(context, run.datasetIdentity, heldOutIntegrity.message, heldOutIntegrity.violation);
   }
 
   const plannedCaseIds = context.dataset.cases.map((evaluationCase) => evaluationCase.caseId);
@@ -221,6 +237,7 @@ export function aggregateEvaluationReport(
     : 'PARTIAL';
   return Object.freeze({
     reportId: context.reportId,
+    evaluationContractHash: computeEvaluationContractHash(),
     executionStatus: status,
     run,
     executionSummary: executionSummary(input),
