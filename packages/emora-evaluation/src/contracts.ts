@@ -148,6 +148,18 @@ export interface EvaluationCase {
  */
 export type DatasetRole = 'DESIGN' | 'HELD_OUT';
 
+/**
+ * Provenance only; these fields are excluded from the current content hash.
+ * A seed is present only when the actual generator uses randomness.
+ */
+export interface DatasetGeneratorProvenance {
+  readonly generatorId: string;
+  readonly generatorVersion: string;
+  readonly generatorCommit?: string;
+  readonly configurationHash?: string;
+  readonly seed?: string | number;
+}
+
 export interface EvaluationDataset {
   readonly datasetId: string;
   readonly datasetVersion: string;
@@ -156,6 +168,7 @@ export interface EvaluationDataset {
   readonly referenceType: ReferenceType;
   readonly role: DatasetRole;
   readonly heldOutParameterVersionIds?: readonly string[];
+  readonly generatorProvenance?: DatasetGeneratorProvenance;
   readonly title: string;
   readonly description: string;
   readonly casesCount: number;

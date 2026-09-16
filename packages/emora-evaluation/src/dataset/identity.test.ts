@@ -21,7 +21,21 @@ describe('dataset identity (MDS v1.0 §13)', () => {
   });
 
   it('ignores descriptive fields outside the identity object', () => {
-    const withExtras = { ...identity, title: 'x', description: 'y', role: 'DESIGN', provenanceMetadata: { z: 1 }, casesCount: 1 };
+    const withExtras = {
+      ...identity,
+      title: 'x',
+      description: 'y',
+      role: 'DESIGN',
+      provenanceMetadata: { z: 1 },
+      casesCount: 1,
+      generatorProvenance: {
+        generatorId: 'fixture-generator',
+        generatorVersion: '1.0.0',
+        generatorCommit: 'generator-commit',
+        configurationHash: 'generator-config',
+        seed: 'seed-1',
+      },
+    };
     expect(computeDatasetHash(withExtras)).toBe(computeDatasetHash(identity));
   });
 

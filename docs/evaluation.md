@@ -112,6 +112,12 @@ commit, evaluation contract version and `evaluationContractHash` (deterministic
 hash of the frozen metric definitions, ranking protocol, and dimension registry),
 runtime contract, configuration hash, and caller-supplied `toolchainIdentity`.
 
+Synthetic dataset generator provenance is optional and caller-supplied: generator
+id/version, generator commit, generator configuration hash, and a seed only when
+the generator actually uses randomness. Generator provenance is usage metadata;
+it is excluded from the current dataset content hash, which remains exactly
+`hashCanonical({ datasetId, datasetVersion, referenceType, cases })`.
+
 Scientific: case id, reference type, dataset role (`DESIGN` / `HELD_OUT`) with
 held-out parameter versions, per-case annotator counts and inter-rater values as
 supplied, and annotation provenance (`DEFERRED` for human data).
