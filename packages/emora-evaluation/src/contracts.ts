@@ -214,7 +214,7 @@ export interface MetricResult {
    * coverage or missingness measure. MetricCoverage (runner) is authoritative.
    */
   readonly missingCasesCount: number;
-  readonly status: 'COMPUTED' | 'INVALID' | 'INSUFFICIENT_DATA';
+  readonly status: 'COMPUTED' | 'INVALID' | 'INSUFFICIENT_DATA' | 'UNDEFINED';
   readonly failureReason?: string;
 }
 
@@ -234,7 +234,8 @@ export type CoverageExclusionReason =
   | 'UNKNOWN_DIMENSION'
   | 'MIXED_SEMANTIC_SPACE'
   | 'INSUFFICIENT_DATA'
-  | 'METRIC_INVALID';
+  | 'METRIC_INVALID'
+  | 'METRIC_UNDEFINED';
 
 export interface CoverageExclusion {
   readonly caseId: string;
@@ -419,14 +420,16 @@ export interface EvaluationMissingnessSummary {
 
 /**
  * Whether/why a metric produced a result for this run. DEFERRED and
- * UNDEFINED are methodological states (see MetricDefinition.assumptions),
- * never a model failure. NOT_APPLICABLE means the metric's annotationType
- * did not match any case in the dataset.
+ * METHODOLOGY_UNDEFINED are methodological states (see MetricDefinition.assumptions).
+ * UNDEFINED is a mathematically undefined result (for example, zero Pearson
+ * variance), never a model failure. NOT_APPLICABLE means the metric's
+ * annotationType did not match any case in the dataset.
  */
 export type MetricComputationStatus =
   | 'COMPUTED'
   | 'NOT_COMPUTED'
   | 'INSUFFICIENT_DATA'
+  | 'UNDEFINED'
   | 'METHODOLOGY_DEFERRED'
   | 'METHODOLOGY_UNDEFINED'
   | 'NOT_APPLICABLE';

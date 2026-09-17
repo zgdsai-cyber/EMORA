@@ -1,5 +1,6 @@
 import {
   calculateMAE,
+  calculatePearson,
   calculateRMSE,
   calculateSpearman,
   isValidCompetitionRanking,
@@ -233,7 +234,8 @@ interface DimensionSeries {
 }
 
 /**
- * MAE/RMSE (Model B, MDS §5.1/§8.1): unit is (case, dimension), one fixed dimension
+ * MAE/RMSE/Pearson (Model B, MDS §5.1/§8.1 and Phase 6.11): unit is
+ * (case, dimension), one fixed behavioral dimension
  * across every EXACT_VECTOR case. Eligibility order: registry classification
  * (unknown → violation; COMPUTATIONAL → excluded), reference validity, execution
  * status, model/reference pairing. Each dimension is filtered independently; nothing
@@ -293,7 +295,7 @@ function evaluateFixedDimensions(
     const series = seriesByDimension.get(dimension)!;
     const eligible = series.reference.length;
     if (!series.behavioralTarget) {
-      for (const metricId of ['MAE', 'RMSE']) {
+      for (const metricId of ['MAE', 'RMSE', 'PEARSON_R']) {
         coverageEntries.push(coverage(metricId, 'CASE_DIMENSION', dimension, series.planned, 0, 0, series.exclusions));
       }
       continue;
@@ -301,6 +303,7 @@ function evaluateFixedDimensions(
     const computed = [
       calculateMAE(series.reference, series.model, dimension),
       calculateRMSE(series.reference, series.model, dimension),
+      calculatePearson(series.reference, series.model, dimension),
     ];
     for (const result of computed) {
       const contributing = result.status === 'COMPUTED' ? result.sampleSize : 0;
@@ -308,7 +311,13 @@ function evaluateFixedDimensions(
         ? series.exclusions
         : [...series.exclusions, ...series.eligibleCaseIds.map((caseId) => ({
             caseId,
-            reason: (result.status === 'INSUFFICIENT_DATA' ? 'INSUFFICIENT_DATA' : 'METRIC_INVALID') as CoverageExclusionReason,
+            reason: (
+              result.status === 'INSUFFICIENT_DATA'
+                ? 'INSUFFICIENT_DATA'
+                : result.status === 'UNDEFINED'
+                  ? 'METRIC_UNDEFINED'
+                  : 'METRIC_INVALID'
+            ) as CoverageExclusionReason,
             detail: result.failureReason,
           }))];
       const entry = coverage(result.metricId, 'CASE_DIMENSION', dimension, series.planned, eligible, contributing, exclusions);

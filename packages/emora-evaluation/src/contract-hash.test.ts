@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { hashCanonical } from './canonicalize';
 import {
   computeEvaluationContractHash,
+  EVALUATION_CONTRACT_VERSION,
   EVALUATION_CONTRACT_DEFINITION,
   hashEvaluationContract,
 } from './contract-hash';
@@ -13,6 +14,16 @@ describe('evaluation contract hash (Phase 6.7)', () => {
     expect(computeEvaluationContractHash()).toBe(computeEvaluationContractHash());
     expect(computeEvaluationContractHash()).toBe(hashCanonical(EVALUATION_CONTRACT_DEFINITION));
     expect(computeEvaluationContractHash()).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('publishes the Phase 6.11 caller-supplied contract version', () => {
+    expect(EVALUATION_CONTRACT_VERSION).toBe('mds-v1.0-pearson-v1');
+    expect(computeEvaluationContractHash()).toBe(
+      '42a6db1a0f1b0658ee7ce12f5ab84a809d84fa296c41001d92fda1782a3906ed',
+    );
+    expect(computeEvaluationContractHash()).not.toBe(
+      'cf1b71d4dc4e7f7bcbdc3aeb710aa50d0dde3a1614dd1a0562574d440d5ab4ae',
+    );
   });
 
   it('covers metric definitions, the ranking protocol, and the dimension registry', () => {

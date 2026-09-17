@@ -122,10 +122,32 @@ Scientific: case id, reference type, dataset role (`DESIGN` / `HELD_OUT`) with
 held-out parameter versions, per-case annotator counts and inter-rater values as
 supplied, and annotation provenance (`DEFERRED` for human data).
 
+## Phase 6.11 descriptive Pearson correlation
+
+Pearson correlation is an executable descriptive metric over paired, finite
+`EXACT_VECTOR` observations with unit `(case, dimension)`, aggregated at run
+level for one fixed behavioral dimension. It applies to EMOTION and
+CONTINUOUS_AFFECT dimensions only; computational dimensions remain excluded.
+The technical minimum is $n \geq 2$, not a scientific sufficiency threshold.
+Missing, invalid, and absent observations are excluded through `MetricCoverage`
+without imputation or implicit reordering.
+
+Pearson is mathematically `UNDEFINED` when either paired series has zero
+variance. This is distinct from `INVALID` input and `INSUFFICIENT_DATA`, is
+never coerced to a numeric correlation, and remains descriptive rather than an
+inferential or psychological-validity claim. Runs governed by this activation
+use caller-supplied contract version `mds-v1.0-pearson-v1` and the corresponding
+canonical `evaluationContractHash`; prior run identities remain unchanged.
+
+Directional Accuracy remains methodology-undefined and is not executed. Current
+contracts do not define temporal state pairing, sequence/transition identity, or
+reference-delta provenance, so no direction semantics or temporal contracts are
+introduced here.
+
 ## Deferred methodology
 
-The following remain intentionally deferred and are not implemented: Pearson
-methodology (unit and execution), Directional Accuracy methodology, Kendall
+The following remain intentionally deferred and are not implemented: Directional
+Accuracy methodology, Kendall
 (removed from the roadmap), participant/scenario clustering and repeated-measure
 methodology, human annotation aggregation, inter-rater coefficients, baseline
 counterexample prioritization, automatic scientific-support label assignment,

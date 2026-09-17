@@ -138,6 +138,12 @@ function metricStatusSummaries(
     ) {
       return { metricId: definition.metricId, computationStatus: 'INSUFFICIENT_DATA' };
     }
+    if (
+      results.caseLevel.some((result) => result.status === 'UNDEFINED')
+      || results.runLevel.some((result) => result.status === 'UNDEFINED')
+    ) {
+      return { metricId: definition.metricId, computationStatus: 'UNDEFINED' };
+    }
     return { metricId: definition.metricId, computationStatus: 'NOT_COMPUTED' as MetricComputationStatus };
   }));
 }

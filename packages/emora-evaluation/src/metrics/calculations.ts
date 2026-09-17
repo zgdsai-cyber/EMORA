@@ -145,7 +145,7 @@ export function calculatePearson(
       value: Number.NaN,
       sampleSize: n,
       missingCasesCount: 0,
-      status: 'INVALID',
+      status: 'UNDEFINED',
       failureReason: 'Zero variance in observed or predicted series.',
     });
   }

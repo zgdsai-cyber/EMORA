@@ -44,12 +44,13 @@ export const PEARSON_METRIC_DEFINITION: MetricDefinition = Object.freeze({
   annotationType: 'EXACT_VECTOR',
   scale: 'BOUNDED_MINUS1_1',
   assumptions: Object.freeze([
-    'DEFERRED — REQUIRES METHODOLOGICAL DECISION.',
-    'The sampling unit and vector-level aggregation semantics for Pearson are not currently defined by an approved EMORA evaluation contract.',
-    'No approved vector-level Pearson orchestration equivalent to calculateVectorMAE/calculateVectorRMSE exists.',
+    'Phase 6.11: sampling unit is one EvaluationCase per observation, for one fixed behavioral target dimension, aggregated across the evaluation dataset.',
+    'Result scope is run-level, not case-level; it uses the same independently filtered paired series as MAE/RMSE for the dimension.',
+    'Technical minimum n >= 2; this is not a scientific sufficiency threshold.',
     'Paired finite numerical observations',
-    'Non-zero variance in both target and prediction series',
+    'Zero variance in either series is mathematically UNDEFINED, not INVALID, INSUFFICIENT_DATA, or COMPUTED.',
     'Linear association measurement without scale or offset calibration',
+    'Descriptive only: no inferential interpretation, threshold, ranking, or composite score.',
   ]),
 });
 

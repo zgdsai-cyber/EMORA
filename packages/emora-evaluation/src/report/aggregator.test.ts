@@ -143,6 +143,21 @@ describe('aggregateEvaluationReport', () => {
     expect(report.counterexampleReferences).toBeUndefined();
   });
 
+  it('preserves a mathematically undefined Pearson result as UNDEFINED', () => {
+    const pearsonUndefinedRun = {
+      ...run(['SUCCESS', 'SUCCESS']),
+      runLevelMetricResults: [metricResult('PEARSON_R', 'UNDEFINED')],
+    };
+    const report = aggregateEvaluationReport(
+      { kind: 'RUN_AVAILABLE', run: pearsonUndefinedRun },
+      context(),
+    );
+
+    if (report.executionStatus === 'FAILED') throw new Error('Expected run report.');
+    expect(report.metricStatusSummaries.find((summary) => summary.metricId === 'PEARSON_R'))
+      .toEqual({ metricId: 'PEARSON_R', computationStatus: 'UNDEFINED' });
+  });
+
   it('returns PARTIAL only when a planned case ID is absent', () => {
     const report = aggregateEvaluationReport(
       { kind: 'RUN_AVAILABLE', run: run(['SUCCESS'], ['case-1']) },
@@ -451,7 +466,7 @@ describe('aggregateEvaluationReport', () => {
     expect(report.metricStatusSummaries).toEqual(expect.arrayContaining([
       { metricId: 'MAE', computationStatus: 'COMPUTED' },
       { metricId: 'RMSE', computationStatus: 'INSUFFICIENT_DATA' },
-      expect.objectContaining({ metricId: 'PEARSON_R', computationStatus: 'METHODOLOGY_DEFERRED' }),
+      { metricId: 'PEARSON_R', computationStatus: 'NOT_COMPUTED' },
       { metricId: 'SPEARMAN_RHO', computationStatus: 'COMPUTED' },
       expect.objectContaining({ metricId: 'DIRECTIONAL_ACCURACY', computationStatus: 'METHODOLOGY_UNDEFINED' }),
     ]));

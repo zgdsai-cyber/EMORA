@@ -4,7 +4,7 @@ import type { StateTransitionProvider } from '@emora/emotional-core';
 
 import type { EvaluationDataset, EvaluationRequest } from '../contracts';
 import { computeDatasetHash, EvaluationContractViolationError } from '../dataset/identity';
-import { computeEvaluationContractHash } from '../contract-hash';
+import { computeEvaluationContractHash, EVALUATION_CONTRACT_VERSION } from '../contract-hash';
 import { MAE_METRIC_DEFINITION, RMSE_METRIC_DEFINITION, SPEARMAN_METRIC_DEFINITION } from '../metrics/definitions';
 import { aggregateEvaluationReport } from '../report/aggregator';
 import { runBehavioralEvaluation } from './runner';
@@ -72,7 +72,7 @@ function request(
     },
     parameterVersionId: 'opaque-parameter-version',
     parameterVersionHash: 'opaque-parameter-hash',
-    evaluationContractVersion: 'l2-b-v1',
+    evaluationContractVersion: EVALUATION_CONTRACT_VERSION,
     configurationHash: 'configuration-hash-supplied-by-caller',
   };
 }
@@ -127,7 +127,7 @@ describe('runBehavioralEvaluation', () => {
     });
     expect(run.parameterVersionId).toBe('opaque-parameter-version');
     expect(run.parameterVersionHash).toBe('opaque-parameter-hash');
-    expect(run.evaluationContractVersion).toBe('l2-b-v1');
+    expect(run.evaluationContractVersion).toBe(EVALUATION_CONTRACT_VERSION);
     expect(run.configurationHash).toBe('configuration-hash-supplied-by-caller');
     expect(run.executionTimestamp).toBe(executionMetadata.executionTimestamp);
   });
@@ -538,8 +538,8 @@ describe('runBehavioralEvaluation', () => {
     expect(run.technicalContractViolations).toEqual([]);
   });
 
-  // Test 4 — Pearson is not executed.
-  it('never produces a Pearson result even when EXACT_VECTOR data would allow it', () => {
+  // Phase 6.11 — Pearson is a run-level, fixed-dimension descriptive metric.
+  it('computes Pearson per eligible fixed dimension and records coverage', () => {
     const cases = [exactCase('case-1', 0.1, 0.9), exactCase('case-2', 0.5, 0.5), exactCase('case-3', 0.9, 0.1)];
     const run = runBehavioralEvaluation(
       request(cases, (input) => {
@@ -555,7 +555,33 @@ describe('runBehavioralEvaluation', () => {
       executionMetadata,
     );
 
-    expect(allMetricResults(run).some((result) => result.metricId === 'PEARSON_R')).toBe(false);
+    const pearsonResults = (run.runLevelMetricResults ?? []).filter((result) => result.metricId === 'PEARSON_R');
+    expect(pearsonResults.map((result) => result.dimension).sort()).toEqual(['fear', 'joy']);
+    expect(pearsonResults.every((result) => result.status === 'COMPUTED')).toBe(true);
+    expect(pearsonResults.every((result) => Math.abs(result.value - 1) < 1e-12)).toBe(true);
+    expect(coverageFor(run, 'PEARSON_R', 'joy')).toMatchObject({ planned: 3, eligible: 3, contributing: 3, excluded: 0 });
+    expect(coverageFor(run, 'PEARSON_R', 'fear')).toMatchObject({ planned: 3, eligible: 3, contributing: 3, excluded: 0 });
+  });
+
+  it('records a mathematically undefined Pearson result and explicit coverage', () => {
+    const cases = [exactCase('case-1', 0.5, 0.2), exactCase('case-2', 0.5, 0.4)];
+    const run = runBehavioralEvaluation(
+      request(cases, () => validResult(0.4, 0.3) as never),
+      executionMetadata,
+    );
+
+    const pearson = (run.runLevelMetricResults ?? []).find((result) => result.metricId === 'PEARSON_R' && result.dimension === 'joy');
+    expect(pearson).toMatchObject({ status: 'UNDEFINED', sampleSize: 2 });
+    expect(coverageFor(run, 'PEARSON_R', 'joy')).toMatchObject({
+      planned: 2,
+      eligible: 2,
+      contributing: 0,
+      excluded: 2,
+      exclusions: [
+        { caseId: 'case-1', reason: 'METRIC_UNDEFINED' },
+        { caseId: 'case-2', reason: 'METRIC_UNDEFINED' },
+      ],
+    });
   });
 
   // Test 5 — Directional Accuracy is not executed.
@@ -617,8 +643,8 @@ describe('runBehavioralEvaluation', () => {
     });
   });
 
-  // MDS §3.3 / §4 — COMPUTATIONAL dimensions never enter behavioral MAE/RMSE.
-  it('excludes confidence and confidenceAdjustment from behavioral MAE/RMSE without deleting them from model output', () => {
+  // MDS §3.3 / §4 — COMPUTATIONAL dimensions never enter behavioral fixed-dimension metrics.
+  it('excludes confidence and confidenceAdjustment from behavioral metrics without deleting them from model output', () => {
     const run = runBehavioralEvaluation(
       request([{
         ...exactCase('case-conf', 0.6, 0.2),
@@ -628,7 +654,7 @@ describe('runBehavioralEvaluation', () => {
     );
 
     expect(run.caseResults[0].modelObservation.observedValues?.confidence).toBe(0.8);
-    expect((run.runLevelMetricResults ?? []).map((result) => result.dimension)).toEqual(['joy', 'joy']);
+    expect((run.runLevelMetricResults ?? []).map((result) => result.dimension)).toEqual(['joy', 'joy', 'joy']);
     expect(coverageFor(run, 'MAE', 'confidence')).toMatchObject({
       planned: 1,
       eligible: 0,
@@ -636,6 +662,7 @@ describe('runBehavioralEvaluation', () => {
       exclusions: [{ caseId: 'case-conf', reason: 'COMPUTATIONAL_DIMENSION_EXCLUDED' }],
     });
     expect(coverageFor(run, 'RMSE', 'confidenceAdjustment')?.exclusions[0].reason).toBe('COMPUTATIONAL_DIMENSION_EXCLUDED');
+    expect(coverageFor(run, 'PEARSON_R', 'confidence')?.exclusions[0].reason).toBe('COMPUTATIONAL_DIMENSION_EXCLUDED');
     expect(run.technicalContractViolations).toEqual([]);
   });
 

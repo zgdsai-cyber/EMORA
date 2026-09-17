@@ -10,6 +10,9 @@ import {
   SPEARMAN_METRIC_DEFINITION,
 } from './metrics/definitions';
 
+/** Caller-supplied version for runs governed by the Phase 6.11 Pearson contract. */
+export const EVALUATION_CONTRACT_VERSION = 'mds-v1.0-pearson-v1';
+
 /** Frozen, runtime-independent definition of the evaluation contract; no results, timestamps, or model output. */
 export interface EvaluationContractDefinition {
   readonly metricDefinitions: readonly MetricDefinition[];

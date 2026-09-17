@@ -132,15 +132,31 @@ describe('L2-A pure metric calculations - Pearson Correlation', () => {
     expect(result.value).toBeCloseTo(-1.0);
   });
 
-  it('returns INVALID when variance is zero in one or both series', () => {
-    const result = calculatePearson([0.5, 0.5, 0.5], [0.1, 0.5, 0.9], 'joy');
-    expect(result.status).toBe('INVALID');
-    expect(result.failureReason).toContain('Zero variance');
+  it('returns UNDEFINED when variance is zero in either series', () => {
+    const referenceVariance = calculatePearson([0.5, 0.5, 0.5], [0.1, 0.5, 0.9], 'joy');
+    const modelVariance = calculatePearson([0.1, 0.5, 0.9], [0.5, 0.5, 0.5], 'joy');
+    expect(referenceVariance.status).toBe('UNDEFINED');
+    expect(modelVariance.status).toBe('UNDEFINED');
+    expect(Number.isNaN(referenceVariance.value)).toBe(true);
+    expect(Number.isNaN(modelVariance.value)).toBe(true);
+    expect(referenceVariance).toEqual(calculatePearson([0.5, 0.5, 0.5], [0.1, 0.5, 0.9], 'joy'));
+    expect(referenceVariance.failureReason).toContain('Zero variance');
+  });
+
+  it('returns INVALID for mismatched lengths and non-finite input', () => {
+    expect(calculatePearson([0.1], [0.1, 0.2], 'joy').status).toBe('INVALID');
+    expect(calculatePearson([0.1, Number.NaN], [0.1, 0.2], 'joy').status).toBe('INVALID');
   });
 
   it('returns INSUFFICIENT_DATA when sample size is less than 2', () => {
     const result = calculatePearson([0.5], [0.5]);
     expect(result.status).toBe('INSUFFICIENT_DATA');
+  });
+
+  it('keeps zero-rank-variance Spearman mathematically undefined', () => {
+    const result = calculateSpearman([0.5, 0.5, 0.5], [0.1, 0.2, 0.3]);
+    expect(result.status).toBe('UNDEFINED');
+    expect(result.failureReason).toContain('Zero variance');
   });
 });
 
@@ -169,10 +185,6 @@ describe('L2-A pure metric calculations - Fractional Ranks & Spearman', () => {
     expect(result.value).toBeGreaterThan(0.9);
   });
 
-  it('returns INVALID when all values are tied (zero rank variance)', () => {
-    const result = calculateSpearman([0.5, 0.5, 0.5], [0.1, 0.2, 0.3]);
-    expect(result.status).toBe('INVALID');
-  });
 });
 
 describe('competition-rank validation (MDS v1.0 §6.2, A1)', () => {
