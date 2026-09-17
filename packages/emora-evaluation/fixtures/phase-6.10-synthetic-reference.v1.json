@@ -1,0 +1,87 @@
+{
+  "datasetId": "phase-6.10-synthetic-reference-v1",
+  "datasetVersion": "1.0.0",
+  "datasetHash": "cdb6d1f89b394ba90c986dd83a2fbc46f103f567c5790c69f9e74a0473ab83bc",
+  "referenceType": "EXPERT_DESIGN",
+  "role": "DESIGN",
+  "title": "Phase 6.10 hand-authored synthetic reference corpus v1",
+  "description": "Seven deterministic software-evaluation cases with independently authored engineering expectations; not human evidence or psychological ground truth.",
+  "casesCount": 7,
+  "cases": [
+    {
+      "caseId": "neutral-low-impact",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "neutral-low-impact-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 0, "intensity": 0.1, "relevance": 0.1, "surprise": 0, "uncertainty": 0 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "valence": 0, "arousal": 0.1, "intensity": 0.1, "joy": 0.1 }, "metadata": { "purpose": "Exercise a bounded low-impact response without asserting a universal neutral emotion.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "trust", "anger", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "positive-event",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "positive-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 1, "intensity": 0.8, "relevance": 0.8, "surprise": 0.2, "uncertainty": 0.1 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "joy": 0.6, "trust": 0.4, "valence": 0.6, "arousal": 0.5, "intensity": 0.6 }, "metadata": { "purpose": "Exercise a bounded positive-valence scenario with limited target dimensions.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "anger", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "negative-event",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "negative-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": -1, "intensity": 0.8, "relevance": 0.8, "surprise": 0.2, "uncertainty": 0.8 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "fear": 0.6, "anger": 0.5, "valence": -0.6, "arousal": 0.6, "intensity": 0.6 }, "metadata": { "purpose": "Exercise a bounded negative-valence scenario without treating it as a human fear or anger scale.", "excludedDimensions": ["love", "nostalgia", "jealousy", "trust", "joy", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "low-surprise",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "low-surprise-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 0.7, "intensity": 0.5, "relevance": 0.7, "surprise": 0.1, "uncertainty": 0.1 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "joy": 0.4, "valence": 0.4, "arousal": 0.3, "intensity": 0.4 }, "metadata": { "purpose": "Provide a low-surprise comparison point for the separately authored high-surprise case.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "trust", "anger", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "high-surprise",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "high-surprise-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 0.7, "intensity": 0.5, "relevance": 0.7, "surprise": 0.9, "uncertainty": 0.1 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "joy": 0.5, "valence": 0.3, "arousal": 0.8, "intensity": 0.8 }, "metadata": { "purpose": "Exercise high surprise as an input condition without asserting a universal surprise response.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "trust", "anger", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "standard-personality",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "personality-contrast-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 0.8, "intensity": 0.7, "relevance": 0.7, "surprise": 0.2, "uncertainty": 0.1 },
+        "personalityProfile": { "id": "standard-profile", "emotionalSensitivity": 0.5, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "joy": 0.5, "trust": 0.4, "valence": 0.5 }, "metadata": { "purpose": "Reference the standard-profile side of a sensitivity contrast.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "anger", "arousal", "intensity", "confidence", "confidenceAdjustment"] } }
+    },
+    {
+      "caseId": "high-sensitivity-personality",
+      "datasetId": "phase-6.10-synthetic-reference-v1",
+      "input": {
+        "currentState": { "emotionVector": { "love": 0, "fear": 0, "nostalgia": 0, "jealousy": 0, "trust": 0, "anger": 0, "joy": 0 }, "dimensions": { "valence": 0, "arousal": 0, "intensity": 0, "confidence": 0.8 }, "timestamp": "2026-01-01T00:00:00.000Z" },
+        "event": { "id": "personality-contrast-event", "timestamp": "2026-01-01T00:01:00.000Z", "source": "phase-6.10-hand-authored", "valence": 0.8, "intensity": 0.7, "relevance": 0.7, "surprise": 0.2, "uncertainty": 0.1 },
+        "personalityProfile": { "id": "high-sensitivity-profile", "emotionalSensitivity": 0.9, "baselineTrust": 0.5, "baselineAnxiety": 0.5, "attachmentSensitivity": 0.5, "nostalgiaSensitivity": 0.5, "jealousySensitivity": 0.5 }
+      },
+      "referenceAnnotation": { "annotationType": "EXACT_VECTOR", "targetValues": { "joy": 0.7, "trust": 0.6, "valence": 0.6 }, "metadata": { "purpose": "Reference the high-sensitivity side of a sensitivity contrast.", "excludedDimensions": ["love", "fear", "nostalgia", "jealousy", "anger", "arousal", "intensity", "confidence", "confidenceAdjustment"] } }
+    }
+  ],
+  "provenanceMetadata": {
+    "construction": "HAND_AUTHORED_DETERMINISTIC",
+    "referenceIndependence": "Targets are authored independently of EMORA outputs and are not tuned against evaluation metrics.",
+    "scientificBoundary": "Controlled software-evaluation artifact only; not human psychological ground truth or validation."
+  }
+}

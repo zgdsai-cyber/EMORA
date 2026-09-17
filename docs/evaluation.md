@@ -158,3 +158,35 @@ from EMORA outputs, and is not human evidence, psychological validation, or a
 benchmark corpus. The seven-dimension rationale in `docs/emotional-model.md`
 documents theoretical anchors, EMORA operationalizations, and non-claims while
 leaving the frozen registry and equations unchanged.
+
+## Phase 6.10 synthetic reference corpus v1
+
+The Phase 6.10 corpus is a small, repository-contained `EXPERT_DESIGN` /
+`DESIGN` artifact for controlled model-behavior verification, regression testing,
+and evaluation-pipeline validation. It is hand-authored, deterministic, and
+reproducible; it is not human psychological ground truth, empirical or clinical
+validation, population evidence, or evidence that EMORA correctly models human
+emotion.
+
+The v1 fixture contains seven deliberately scoped `EXACT_VECTOR` cases:
+neutral low-impact, positive event, negative event, low surprise, high surprise,
+standard personality, and high-sensitivity personality. Each case carries a
+short purpose and explicit excluded dimensions in annotation metadata. Partial
+targets are intentional: values are finite, bounded engineering expectations,
+not objectively correct human responses. Computational dimensions are excluded
+from reference targets. No `RANKING`, interval, distribution, or directional
+execution methodology is added in this phase.
+
+Reference targets are authored independently of EMORA outputs. They must not be
+generated, copied, transformed, tuned, or optimized from EMORA runs or metrics.
+Structural tests can verify the fixture's shape and identity, but cannot prove
+the historical authorship process. The fixture uses no generator metadata or
+seed because it is hand-authored rather than produced by a generator.
+
+The corpus preserves MDS v1.0 unchanged, including the content identity
+`hashCanonical({ datasetId, datasetVersion, referenceType, cases })`; title,
+description, provenance metadata, and runtime information remain outside that
+identity. It is consumable by the existing Phase 6.9 candidate/baseline
+comparator without adding baselines, scores, winners, labels, metrics, or
+scientific claims. Human behavioral evaluation remains a separate future
+methodology.
