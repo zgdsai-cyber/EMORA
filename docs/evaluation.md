@@ -128,7 +128,33 @@ The following remain intentionally deferred and are not implemented: Pearson
 methodology (unit and execution), Directional Accuracy methodology, Kendall
 (removed from the roadmap), participant/scenario clustering and repeated-measure
 methodology, human annotation aggregation, inter-rater coefficients, baseline
-execution and comparator contracts, counterexample prioritization, automatic
-scientific-support label assignment, statistical inference (confidence intervals,
+counterexample prioritization, automatic scientific-support label assignment,
+statistical inference (confidence intervals,
 hypothesis tests, multiplicity, non-inferiority), scientific thresholds,
 ML/training, and dataset splitting for training.
+
+## Phase 6.9 comparator boundary
+
+Phase 6.9 permits only deterministic, descriptive comparator contracts. A
+constant baseline must declare one bounded value for each supported behavioral
+dimension and must not fit values from evaluation data. A deterministic ablation
+must be represented by an immutable, caller-governed parameter configuration;
+this evaluation package deliberately provides no parameter conversion, hash
+verification, activation, mutation, or execution decorator for that configuration.
+Those operations remain exclusively with the already-governed caller. Runtime
+mutable ablation switches are not permitted. The semantics of a generic
+`NAIVE` baseline, persistence, previous-version comparison, and random baselines
+remain deferred.
+
+Candidate and baseline results must be paired only when the dataset id, version,
+canonical content hash, reference type, ordered case identities, and evaluation
+contract hash match. Candidate and baseline parameter/engine identities remain
+separate provenance; comparison does not calculate a winner, superiority,
+relative improvement, scientific score, or scientific support label.
+
+The minimal synthetic comparator fixture is an `EXPERT_DESIGN` software
+verification artifact. It is independently authored, not reverse-engineered
+from EMORA outputs, and is not human evidence, psychological validation, or a
+benchmark corpus. The seven-dimension rationale in `docs/emotional-model.md`
+documents theoretical anchors, EMORA operationalizations, and non-claims while
+leaving the frozen registry and equations unchanged.

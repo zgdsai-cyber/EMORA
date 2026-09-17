@@ -1,0 +1,162 @@
+{
+  "datasetId": "phase-6.9-comparator-synthetic",
+  "datasetVersion": "1.0.0",
+  "datasetHash": "9bfdc93645374c0ff321982bd7a989a2408bfa83f55dfa052a16d58485b06ad8",
+  "referenceType": "EXPERT_DESIGN",
+  "role": "DESIGN",
+  "generatorProvenance": {
+    "generatorId": "phase-6.9-hand-authored-fixture",
+    "generatorVersion": "1.0.0",
+    "generatorCommit": "452a13f"
+  },
+  "title": "Phase 6.9 comparator verification fixture",
+  "description": "Small synthetic software-verification fixture; not human evidence or psychological ground truth.",
+  "casesCount": 3,
+  "cases": [
+    {
+      "caseId": "positive-valence",
+      "datasetId": "phase-6.9-comparator-synthetic",
+      "input": {
+        "currentState": {
+          "emotionVector": {
+            "love": 0,
+            "fear": 0,
+            "nostalgia": 0,
+            "jealousy": 0,
+            "trust": 0,
+            "anger": 0,
+            "joy": 0
+          },
+          "dimensions": {
+            "valence": 0,
+            "arousal": 0,
+            "intensity": 0,
+            "confidence": 0.8
+          },
+          "timestamp": "2026-01-01T00:00:00.000Z"
+        },
+        "event": {
+          "id": "positive-valence-event",
+          "timestamp": "2026-01-01T00:01:00.000Z",
+          "source": "phase-6.9",
+          "valence": 1,
+          "intensity": 0.8,
+          "relevance": 0.8,
+          "surprise": 0.2,
+          "uncertainty": 0.1
+        },
+        "personalityProfile": {
+          "id": "fixture-profile",
+          "emotionalSensitivity": 0.5,
+          "baselineTrust": 0.5,
+          "baselineAnxiety": 0.5,
+          "attachmentSensitivity": 0.5,
+          "nostalgiaSensitivity": 0.5,
+          "jealousySensitivity": 0.5
+        }
+      },
+      "referenceAnnotation": {
+        "annotationType": "EXACT_VECTOR",
+        "targetValues": { "joy": 0.8, "trust": 0.6 }
+      }
+    },
+    {
+      "caseId": "negative-valence",
+      "datasetId": "phase-6.9-comparator-synthetic",
+      "input": {
+        "currentState": {
+          "emotionVector": {
+            "love": 0,
+            "fear": 0,
+            "nostalgia": 0,
+            "jealousy": 0,
+            "trust": 0,
+            "anger": 0,
+            "joy": 0
+          },
+          "dimensions": {
+            "valence": 0,
+            "arousal": 0,
+            "intensity": 0,
+            "confidence": 0.8
+          },
+          "timestamp": "2026-01-01T00:00:00.000Z"
+        },
+        "event": {
+          "id": "negative-valence-event",
+          "timestamp": "2026-01-01T00:01:00.000Z",
+          "source": "phase-6.9",
+          "valence": -1,
+          "intensity": 0.8,
+          "relevance": 0.8,
+          "surprise": 0.2,
+          "uncertainty": 0.8
+        },
+        "personalityProfile": {
+          "id": "fixture-profile",
+          "emotionalSensitivity": 0.5,
+          "baselineTrust": 0.5,
+          "baselineAnxiety": 0.5,
+          "attachmentSensitivity": 0.5,
+          "nostalgiaSensitivity": 0.5,
+          "jealousySensitivity": 0.5
+        }
+      },
+      "referenceAnnotation": {
+        "annotationType": "EXACT_VECTOR",
+        "targetValues": { "fear": 0.8, "anger": 0.5 }
+      }
+    },
+    {
+      "caseId": "neutral-bounded",
+      "datasetId": "phase-6.9-comparator-synthetic",
+      "input": {
+        "currentState": {
+          "emotionVector": {
+            "love": 0,
+            "fear": 0,
+            "nostalgia": 0,
+            "jealousy": 0,
+            "trust": 0,
+            "anger": 0,
+            "joy": 0
+          },
+          "dimensions": {
+            "valence": 0,
+            "arousal": 0,
+            "intensity": 0,
+            "confidence": 0.8
+          },
+          "timestamp": "2026-01-01T00:00:00.000Z"
+        },
+        "event": {
+          "id": "neutral-bounded-event",
+          "timestamp": "2026-01-01T00:01:00.000Z",
+          "source": "phase-6.9",
+          "valence": 0,
+          "intensity": 0,
+          "relevance": 0,
+          "surprise": 0,
+          "uncertainty": 0
+        },
+        "personalityProfile": {
+          "id": "fixture-profile",
+          "emotionalSensitivity": 0.5,
+          "baselineTrust": 0.5,
+          "baselineAnxiety": 0.5,
+          "attachmentSensitivity": 0.5,
+          "nostalgiaSensitivity": 0.5,
+          "jealousySensitivity": 0.5
+        }
+      },
+      "referenceAnnotation": {
+        "annotationType": "EXACT_VECTOR",
+        "targetValues": { "joy": 0, "fear": 0 }
+      }
+    }
+  ],
+  "provenanceMetadata": {
+    "purpose": "software-verification-only",
+    "humanEvidence": false
+  }
+}

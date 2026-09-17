@@ -5,6 +5,29 @@ emotional states. It is a computational model, not a measurement of a person's
 true internal emotional experience. It does not read minds, diagnose health
 conditions, or claim scientific or clinical validity.
 
+## Seven-dimension rationale (Phase 6.9 documentation supplement)
+
+The current seven-dimensional registry is a frozen computational design choice,
+not a claim that these dimensions form a universal psychological taxonomy. Each
+dimension below separates a broad theoretical anchor from EMORA's engineering
+operationalization; none is presented as an empirically validated law.
+
+| Dimension | Theoretical anchor | EMORA operationalization | Limitation / non-claim |
+| --- | --- | --- | --- |
+| `love` | Attachment, bonding, and positive relational appraisal constructs. | A bounded emotion-vector component receiving configured positive and relational event influence, personality modulation, interaction, memory, and stability terms. | Not a clinical attachment measure or universal measurement of love. |
+| `fear` | Threat appraisal, uncertainty, and negative affect constructs. | A bounded component receiving negative-valence and uncertainty-related influence under the interaction policy. | Not a diagnosis, threat detector, or universal fear scale. |
+| `nostalgia` | Autobiographical memory and affective recollection constructs. | A bounded component influenced by relevance, surprise, memory influence, decay, and configured dynamics. | Not a validated measure of autobiographical nostalgia. |
+| `jealousy` | Individual-difference and relational threat appraisal constructs. | A bounded component using configured uncertainty and negative-valence influences, personality modulation, memory, and interactions. | Not a validated interpersonal or clinical jealousy instrument. |
+| `trust` | Relational expectation and social appraisal constructs. | A bounded component constrained by the interaction policy, including protected sign rules for fear/anger and trust coefficients. | Not a behavioral trust scale or universal social-cognition measure. |
+| `anger` | Goal obstruction, negative appraisal, and action-readiness constructs. | A bounded component receiving negative-valence and relevance influence, personality modulation, interaction, memory, and stability terms. | Not a validated anger or aggression assessment. |
+| `joy` | Positive affect and reward-related appraisal constructs. | A bounded component receiving positive-valence and surprise-related influence, personality modulation, interaction, memory, and stability terms. | Not a validated happiness or well-being measure. |
+
+The registry also exposes `valence`, `arousal`, and `intensity` as continuous
+affect dimensions, while `confidence` and `confidenceAdjustment` are
+computational quantities rather than emotional dimensions. The table documents
+the model's hypotheses and operationalizations only; synthetic or regression
+agreement does not establish human psychological validity.
+
 ## Domain model
 
 `EmotionVector` contains seven discrete, normalized dimensions: `love`, `fear`,

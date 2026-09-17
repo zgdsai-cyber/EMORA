@@ -329,6 +329,59 @@ export interface EvaluationRun {
 }
 
 // ============================================================================
+// PHASE 6.9 — BASELINE / COMPARATOR PURE CONTRACTS
+// ============================================================================
+
+export type BaselineKind = 'CONSTANT' | 'DETERMINISTIC_ABLATION';
+
+export interface BaselineIdentity {
+  readonly baselineId: string;
+  readonly baselineVersion: string;
+  readonly kind: BaselineKind;
+}
+
+export interface ConstantBaselineDefinition extends BaselineIdentity {
+  readonly kind: 'CONSTANT';
+  /** Explicit values for behavioral dimensions; never fitted from evaluation data. */
+  readonly values: Readonly<Record<string, number>>;
+}
+
+export type DeterministicAblationKind =
+  | 'ZERO_INTERACTION_WEIGHTS'
+  | 'ZERO_PERSONALITY_SENSITIVITY_WEIGHTS';
+
+export interface DeterministicAblationDefinition extends BaselineIdentity {
+  readonly kind: 'DETERMINISTIC_ABLATION';
+  /** Opaque identity of the immutable governed parameter configuration supplied by the caller. */
+  readonly parameterVersionId: string;
+  readonly parameterVersionHash: string;
+  readonly ablation: DeterministicAblationKind;
+}
+
+export type BaselineDefinition =
+  | ConstantBaselineDefinition
+  | DeterministicAblationDefinition;
+
+export interface ComparatorPairingIdentity {
+  readonly datasetId: string;
+  readonly datasetVersion: string;
+  readonly datasetHash: string;
+  readonly referenceType: ReferenceType;
+  readonly orderedCaseIds: readonly string[];
+  readonly evaluationContractHash: string;
+}
+
+/** Descriptive side-by-side comparison; no winner, ranking, delta, or score. */
+export interface ComparatorResult {
+  readonly comparatorId: string;
+  readonly comparatorVersion: string;
+  readonly pairing: ComparatorPairingIdentity;
+  readonly baseline: BaselineDefinition;
+  readonly candidateRun: EvaluationRun;
+  readonly baselineRun: EvaluationRun;
+}
+
+// ============================================================================
 // PHASE 6.5-A — EVALUATION REPORT / EVIDENCE BUNDLE PURE CONTRACTS
 // Contract-only: no execution, no metric computation, no aggregation logic.
 // A future pure aggregator (not implemented here) will populate these shapes
