@@ -320,3 +320,46 @@ execution; forged or inconsistent references are rejected.
 
 `HYBRID_FUSION` is excluded from execution in Phase 6.14. Its dedicated artifact
 records `DEFERRED` and contains no cases or results; MDR-009 remains unchanged.
+
+## Phase 6.15 human behavioral evaluation methodology protocol
+
+`src/human-methodology/` defines a versioned, validated, canonically hashed
+methodology artifact for a possible future human behavioral evaluation. Phase
+6.15 is protocol-only: it collects and processes no human data, executes no human
+evaluation, computes no metric or inference, and selects no questionnaire,
+instrument, baseline, model, parameter, or winner.
+
+The protocol records its identity and status; target, excluded, computational-only,
+and deferred outputs/components; the conceptual observation schema; construct
+mappings; governed population and partition definitions; descriptive criteria;
+baseline requirements; repeated-observation and individual-difference
+requirements; leakage controls; falsifiability conditions;
+reproducibility provenance; ethics/governance requirements; scientific boundaries;
+and every unresolved or non-evaluable methodological item. `DEFINED`,
+`UNRESOLVED`, and `NOT_EVALUABLE` are governed states. A protocol cannot be marked
+`DEFINED` while required configuration remains unresolved or non-evaluable.
+Every unresolved population, mapping, criterion, baseline, temporal,
+individual-difference, or partition state requires a matching unresolved-item
+record; a defined descriptive criterion cannot depend on an unresolved mapping.
+
+The canonical Phase 6.15 artifact remains `UNRESOLVED`. No psychological
+equivalence is asserted: emotional and continuous-affect outputs have unresolved
+indirect-indicator mappings, while state `intensity` is `NOT_EVALUABLE` pending an
+approved human construct and measurement mapping. `confidence` and
+`confidenceAdjustment` are explicitly computational-only, and `HYBRID_FUSION`
+remains deferred. The module exports artifact creation/validation only and no
+evaluation runner.
+
+Phase 6.14 remains the separate deterministic **Synthetic Mathematical
+Evaluation** track. Its results are not evidence of human psychological validity.
+Phase 6.16, if separately authorized after the unresolved protocol requirements
+are governed, would be the distinct **Human Behavioral Evaluation** track. Human
+observations would be measurements or indicators rather than direct access to
+internal emotional states; they cannot establish causality, scientific validity,
+clinical interpretation, or automatically modify governed mathematical decisions.
+
+The protocol makes no legal or regulatory compliance claim. Any future collection
+requires study-specific informed-participation/consent handling where applicable,
+pseudonymization, minimization, access control, secure handling, retention/deletion
+and withdrawal procedures, and an explicit prohibition on clinical or diagnostic
+use.
