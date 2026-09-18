@@ -284,3 +284,39 @@ Artifacts accept only inert plain-data graphs (no accessors, custom prototypes,
 symbol properties, sparse arrays, or custom array fields), are deep-frozen, and
 carry `artifactHash = hashCanonical(content)`; identical inputs yield identical
 artifacts.
+
+## Phase 6.14 synthetic mathematical re-evaluation
+
+`src/synthetic-reevaluation/` provides component-local infrastructure for
+deterministic synthetic examination of documented mathematical formulations. A
+formulation is executable only when its equation, variables and domains, construct,
+input domain, output scale and units, parameters, and temporal assumptions are all
+explicit. Missing specification produces `NOT_EVALUABLE` without invoking the
+caller-governed executor.
+
+Plans contain predefined absolute and relative numeric tolerances, deterministic
+cases, declarative property assertions, and complete executor/configuration
+provenance. Every run is executed twice. Artifacts preserve both numeric outputs,
+use only `SATISFIED`, `VIOLATED`, `NOT_APPLICABLE`, or `NOT_EVALUABLE` per property,
+record reproducible counterexamples for violations, are deep-frozen, and carry a
+canonical SHA-256 content hash. Results remain local to one formulation of one
+component; no aggregate status, metric, score, ranking, winner, recommendation, or
+scientific-support label is produced.
+
+Synthetic results are mathematical and engineering observations only. They use no
+human data, inferential statistics, calibration, optimization, parameter fitting,
+ML, or causal inference, and they do not establish human behavioral or
+psychological validity. Candidate source status does not imply mathematical or
+scientific superiority. Construct, scale, units, parameter assumptions, and
+temporal assumptions are preserved verbatim in each artifact.
+
+Current formulations must reference the matching frozen decision-register entry.
+An executable candidate must additionally reference a valid, hash-matching Phase
+6.13 component artifact and an existing candidate id/family within it; its equation
+and variable metadata must match that record. This establishes traceable candidate
+authority without making the candidate approved, selected, or scientifically
+supported. Missing authority or specification yields `NOT_EVALUABLE` without
+execution; forged or inconsistent references are rejected.
+
+`HYBRID_FUSION` is excluded from execution in Phase 6.14. Its dedicated artifact
+records `DEFERRED` and contains no cases or results; MDR-009 remains unchanged.
