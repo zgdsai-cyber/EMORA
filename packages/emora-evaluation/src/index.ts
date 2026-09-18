@@ -12,3 +12,4 @@ export * from './report/aggregator';
 export * from './report/evidence-level';
 export * from './baselines';
 export * from './comparator';
+export * from './candidate-comparison';

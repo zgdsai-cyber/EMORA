@@ -212,3 +212,75 @@ identity. It is consumable by the existing Phase 6.9 candidate/baseline
 comparator without adding baselines, scores, winners, labels, metrics, or
 scientific claims. Human behavioral evaluation remains a separate future
 methodology.
+
+## Phase 6.13 candidate mathematical comparison artifact
+
+`src/candidate-comparison/` provides a read-only analytical data model and
+validation layer for recording candidate mathematical formulations per EMORA
+component. Its purpose is to preserve comparison results in a traceable,
+deterministic form. It does not evaluate, execute, select, or implement any
+candidate, and the current EMORA model remains the active model.
+
+- **Scope.** Every artifact is component-local (`EVENT_IMPACT`,
+  `PERSONALITY_MODIFIER`, `VALENCE`, `AROUSAL`, `INTENSITY`, `MEMORY`,
+  `TEMPORAL_DYNAMICS`, `INTERACTION_MATRIX`, `HYBRID_FUSION`) and carries
+  `scope: 'READ_ONLY_ANALYTICAL'`. No cross-component aggregate, global model
+  score, or project-wide "best formulation" exists. Candidate order is preserved
+  as supplied and carries no meaning.
+- **Provenance.** Each candidate records a `sourceStatus` (`VERIFIED`,
+  `UNVERIFIED`, `NOT_LOCATED`, `NOT_APPLICABLE`, `NOT_REPORTED`), the reported
+  descriptive/causal interpretation, and optional title, authors, year,
+  publication, identifier, equation reference, page, and section.
+- **Source verification.** `VERIFIED` requires `verificationBasis:
+'CALLER_DECLARED_ORIGINAL_SOURCE_INSPECTION'`, `verifiedBy`, title, authors,
+  year, publication, equation reference, and page or section. The status is a
+  caller declaration that the original source was inspected; the validator
+  checks metadata completeness only and never verifies a source itself.
+  Citation by another paper, AI suggestion, or resemblance to EMORA does not
+  qualify. Equations may be recorded under `UNVERIFIED`, `NOT_LOCATED`,
+  `NOT_REPORTED`, or `NOT_APPLICABLE`; storing an equation proves nothing.
+- **Compatibility axes.** `construct`, `input`, `output`, `scale`, `temporal`,
+  `parameter`, `computational`, `interpretability`, each valued only as
+  `COMPATIBLE`, `PARTIALLY_COMPATIBLE`, `INCOMPATIBLE`, or `UNKNOWN`. Numeric
+  values and aggregate/overall compatibility fields are rejected. Mixed
+  compatibility across axes is intentional and preserved.
+- **Evidence taxonomy.** `MATHEMATICAL`, `THEORETICAL`, `EMPIRICAL`,
+  `ENGINEERING` are descriptive labels; no evidence, scientific, or confidence
+  score field is permitted.
+- **Construct separation.** `INTENSITY` candidates must declare
+  `EVENT_INTENSITY` or `EMOTIONAL_STATE_INTENSITY`; `MEMORY` candidates must
+  declare `DECLARATIVE_MEMORY`, `EMOTIONAL_MEMORY`, or
+  `EMOTIONAL_PERSISTENCE_INERTIA`; `INTERACTION_MATRIX` candidates must declare
+  `ASSOCIATION`, `COUPLING`, `DEPENDENCY`, or `CAUSALITY`. `CAUSALITY` is only
+  accepted as reported by a `VERIFIED` source with `CAUSAL` interpretation; a
+  computational coupling is never upgraded to a causal claim.
+- **Synthetic/human separation.** Synthetic requirements carry
+  `evidenceClass: 'SYNTHETIC_MATHEMATICAL'` with engineering/mathematical kinds
+  (boundedness, determinism, monotonicity, edge cases, numerical stability,
+  regression, runtime compatibility, parameter sensitivity). Human requirements
+  carry `evidenceClass: 'HUMAN_BEHAVIORAL'` with methodology kinds (target
+  construct, measurement, participant structure, repeated observations, time
+  scale, annotation, missingness, inter-rater variability, predefined criteria,
+  baseline, held-out). Kinds and classes are disjoint and cross-labelling is
+  rejected. Synthetic metadata is never psychological-validity evidence; no
+  human data is collected and no inference is defined.
+- **No ranking.** No `rank`, `ranking`, `winner`, `score`, `superiority`,
+  `selected`, or `recommendation` field is accepted at any level, and the
+  module exports no selection, ranking, scoring, or optimisation function.
+- **No automatic scientific selection.** Candidate assessment ("how compatible
+  is this candidate with the current EMORA role?") is never transformed into
+  `ADOPT`/`ADAPT`/`RETAIN`/`REJECT`/`DEFER`. A candidate-level `decision` field
+  is rejected.
+- **Relationship to the Mathematical Decision Register.** Each artifact carries
+  a caller-supplied `governedDecisionReference` (`registerVersion`,
+  `decisionId`, `currentDecision`). Only register `1.0.0` is known; any other
+  version fails closed, and the reference must match the frozen Phase 6.12
+  state (`MDR-001`…`MDR-008` `RETAIN`, `MDR-009` `DEFER`). The in-code mirror
+  `MATHEMATICAL_DECISION_REGISTER_1_0_0` is not a second source of truth: a test
+  parses `docs/mathematical-decision-register.md` and fails on divergence. The
+  register itself is unchanged by this phase.
+
+Artifacts accept only inert plain-data graphs (no accessors, custom prototypes,
+symbol properties, sparse arrays, or custom array fields), are deep-frozen, and
+carry `artifactHash = hashCanonical(content)`; identical inputs yield identical
+artifacts.
