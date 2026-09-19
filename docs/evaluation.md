@@ -363,3 +363,53 @@ requires study-specific informed-participation/consent handling where applicable
 pseudonymization, minimization, access control, secure handling, retention/deletion
 and withdrawal procedures, and an explicit prohibition on clinical or diagnostic
 use.
+
+## Phase 6.16 D09 descriptive evaluation criteria
+
+`src/d09/` implements only D09: descriptive correspondence/association between
+EMORA computational outputs and predefined human-observable indicators. Its
+active outputs are Pearson correlation, paired descriptive distributions, and
+explicit coverage/missingness accounting. MAE, RMSE, Spearman, directional
+accuracy, inferential statistics, composite scores, rankings, thresholds,
+baselines, model selection, and automatic model changes remain inactive.
+
+The canonical D09 artifact contains no criteria or human observations and returns
+`NOT_EXECUTABLE_NO_HUMAN_DATA`; it does not authorize collection. It is the only
+contract identity accepted by the execution boundary. Hash integrity does not
+confer methodological authority: caller-created criteria, mappings, instruments,
+or scale interpretations remain non-authoritative even when canonically hashed.
+
+Phase 6.15 remains `UNRESOLVED`, with `execution: NOT_IMPLEMENTED` and
+`humanData: NONE`. Consequently, D09 publishes no executable dimension and cannot
+create a governed human dataset or produce an `EXECUTED` report. Criteria-bearing
+proposals are explicitly `NOT_EXECUTABLE_PHASE_6_15_UNRESOLVED`. The seven
+emotions plus `valence` and `arousal` remain independently representable as
+future proposals; `intensity` remains `NOT_EVALUABLE`, and `confidence` plus
+`confidenceAdjustment` remain computational-only. Changing this state requires a
+future governed Phase 6.15 decision and a new authoritative D09 identity.
+
+The six human states `OBSERVED`, `MISSING`, `INVALID`, `NOT_APPLICABLE`,
+`DECLINED`, and `WITHDRAWN` remain distinct. There is no imputation,
+interpolation, resampling, result-dependent transformation, or silent omission.
+Because Phase 6.15 has not defined an executable eligibility denominator, D09
+reports `NOT_EVALUABLE_PHASE_6_15_UNRESOLVED` rather than fabricating planned,
+eligible, observed, or contributing counts. Exclusions are explicitly
+`NONE_CONFIGURED`, partial-response handling is `NOT_CONFIGURED`, and unsupported
+rules are rejected rather than ignored. Participant aggregation and repeated-
+measures methodology remain deferred; multi-participant, multi-study,
+multi-session, multi-sequence, or incompatible-context pooling is rejected.
+
+Synthetic unit tests use `D09_UNIT_TEST_FIXTURE`, never the governed-human-data
+discriminant. Production evaluation rejects those fixtures as non-human and
+produces no human result. No human dataset is embedded or persisted by D09.
+
+The frozen metric identity points to the existing Phase 6.11 Pearson
+implementation; D09 contains no duplicate Pearson formula. If a future governed
+execution is authorized, its technical minimum $n \geq 2$, finite-pair rule, and
+zero-variance `UNDEFINED` behavior remain applicable. Current reports expose the
+formula identity, metric interpretation, missingness vocabulary, exclusion and
+partial-response states, denominator non-evaluability, deferred aggregation and
+temporal methodology, and explicit scientific boundaries. They contain no human
+statistics. D09 establishes neither construct equivalence, causality,
+psychological or clinical validity, population generalization, nor support for
+changing EMORA mathematics. D10–D16 remain outside this implementation.
