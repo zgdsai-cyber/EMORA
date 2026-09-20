@@ -412,4 +412,74 @@ partial-response states, denominator non-evaluability, deferred aggregation and
 temporal methodology, and explicit scientific boundaries. They contain no human
 statistics. D09 establishes neither construct equivalence, causality,
 psychological or clinical validity, population generalization, nor support for
-changing EMORA mathematics. D10–D16 remain outside this implementation.
+changing EMORA mathematics. D11–D16 remain outside this implementation.
+
+## Phase 6.16 D10 threshold methodology
+
+`src/d10/` implements the resolved D10 methodology as a versioned, validated,
+canonically hashed plain-data contract. A threshold is a predefined, scope-bound
+comparison or interpretation rule applied to a specified descriptive metric under
+explicitly documented methodological, measurement, contextual, temporal,
+denominator, and provenance conditions. It cannot establish psychological or
+scientific validity, emotional truth, emotion detection, causality, prediction,
+calibration, superiority, or scientific success.
+
+Thresholds are optional. The canonical D10 artifact has
+`NO_THRESHOLD_DEFINED`, `numericalThresholds: NONE_DEFINED`, and creates no
+default Pearson threshold. Universal Pearson cutoffs and generic
+weak/moderate/strong conventions are not represented. A future rule can only be
+represented as an immutable, explicitly unauthorized proposal carrying a declared
+rule identity and declared content hash. D10 defines no structured rule-value or
+cutoff field and executes no referenced rule content; it defines no sample-size
+threshold, minimum-$N$ logic, or numerical derivation algorithm. Caller-supplied
+references remain opaque declarations, not executable methodology. A hash
+establishes local content integrity only. It does not establish methodology
+authority, rule correctness, result independence, or temporal priority.
+
+Any future rule must be result-independent and frozen before inspection of the
+results it interprets. Its derivation procedure must also be frozen in advance,
+and any derivation-data identity must be independent of those interpreted
+results. The artifact validates explicit declarations of those requirements but
+records `NOT_VERIFIED_NO_EXTERNAL_TIMELINE_AUTHORITY`: a caller-supplied timestamp
+does not prove that freezing preceded result inspection. `RESULT_DERIVED_PROHIBITED`
+is a validation violation, not an existence, applicability, or provenance state.
+Existence, applicability, provenance, authority, and governance violations remain
+separate concepts.
+
+Every represented rule is scoped to exactly one existing D09 metric and one
+individually named EMORA dimension. Its scope also records the construct, paired
+human indicator, instrument and version, language, scale and direction,
+population, context, temporal relationship, transformation, denominator and
+missingness rule, and exclusions. Provenance records justification, optional
+independent derivation-data identity, methodology/configuration versions, EMORA
+parameter/equation versions, and freeze identity. Application requires an exact
+scope hash match; there is no automatic transfer across dimensions, constructs,
+instruments or versions, languages, populations, contexts, scales,
+transformations, or temporal relationships. A changed scope requires a newly
+defined and frozen artifact. D10 implements no measurement-invariance protocol.
+
+Applicability is fail-closed. The current implementation owns no authorized
+threshold definition, so even a structurally valid, self-hashed proposal with a
+`COMPUTED` metric and exact scope match remains
+`NOT_APPLICABLE_UNAUTHORIZED_THRESHOLD`. No threshold comparison or descriptive
+interpretation is produced. Authorizing a concrete rule requires a separately
+governed future implementation identity; caller declarations and hashes cannot do
+so. `UNDEFINED`, `INVALID`, and `INSUFFICIENT_DATA` metrics remain not evaluable
+and receive no threshold application, zero substitution, success, or failure.
+D09 denominator, missingness, exclusion, and partial-response semantics remain
+unchanged.
+
+D10 introduces no baseline or D11 behavior, validation criterion, p-value,
+alpha, confidence interval, hypothesis test, multiplicity correction, composite
+or global threshold, weighted score, ranking, pass/fail decision, model-quality
+decision, ML threshold, reliability/SEM formula, or engineering/product/
+application flag. Thresholds remain semantically distinct from baselines,
+validation, and statistical significance. The active metric set remains exactly
+D09's Pearson, descriptive distributions, and coverage/missingness; D10 activates
+no additional metric.
+
+No human data, empirical threshold, or normative threshold is introduced. Future
+rule content, numerical values, derivation methods, reliability/precision methods,
+measurement-invariance methods, and any study-specific application remain
+deferred to separately authorized governance. D10 implementation does not make
+Phase 6.15 or D09 executable.

@@ -16,3 +16,4 @@ export * from './candidate-comparison';
 export * from './synthetic-reevaluation';
 export * from './human-methodology';
 export * from './d09';
+export * from './d10';
