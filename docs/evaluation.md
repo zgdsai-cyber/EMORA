@@ -483,3 +483,70 @@ rule content, numerical values, derivation methods, reliability/precision method
 measurement-invariance methods, and any study-specific application remain
 deferred to separately authorized governance. D10 implementation does not make
 Phase 6.15 or D09 executable.
+
+## D11 baseline and comparator boundary
+
+`D11 Baseline & Comparator Methodology v1.0.0` defines a baseline only as a
+predefined contextual reference or comparator under explicitly governed,
+scope-compatible conditions. It is never automatically ground truth,
+psychological or emotional truth, a validity criterion, a threshold, a success
+criterion, a ranking mechanism, a superiority score, or a recommendation.
+
+The D11 taxonomy is closed to `CONSTANT` and `DETERMINISTIC_ABLATION`. A
+constant contains explicit, scope-specific target outputs and has no universal
+default or scientific midpoint. The historical `constant-midpoint` value set
+remains only a Phase 6.9 software fixture. Deterministic ablation is restricted
+to `ZERO_INTERACTION_WEIGHTS` and
+`ZERO_PERSONALITY_SENSITIVITY_WEIGHTS`; it identifies the governed lineage,
+neutralized mechanism, and preserved configuration but supplies no executable
+ablation engine and supports no causal claim. All other baseline classes remain
+deferred.
+
+Definition, execution, and comparison identities are separate. A definition
+snapshots its configuration, scope, provenance, justification, predefinition,
+and independence evidence and receives canonical configuration, scope, and
+definition hashes. Authority is a distinct versioned governance artifact bound
+to the exact definition hash, and it must carry the governed D11 authority
+requirement unchanged; D11 does not adjudicate the issuing body, so no external
+authority service, registry, or signature scheme is assumed. Caller labels, IDs,
+values, flags, metadata, or self-supplied hashes do not create authority. The
+implementation validates declared external approval evidence but does not claim
+to prove historical chronology or external authority by software alone.
+
+Independence provenance distinguishes evaluation results, development/tuning
+data, held-out data where applicable, and external references. Every definition
+must declare either its derivation data sources or, explicitly, that no
+derivation data exist; an empty source list is never evidence of independence,
+absence of overlap, or absence of leakage. Each declared source states its
+derivation use, its evaluation-data overlap status, its independence evidence
+reference, and whether it was removed. Fitting, tuning, optimization, selection,
+result reuse, and post-result construction are prohibited. Held-out data are not
+universally required. Missing or ambiguous independence, predefinition,
+provenance, or authority is fail-closed as `NOT_EVALUABLE`.
+
+Compatibility is exact wherever semantically relevant: dataset ID/version/hash,
+ordered case IDs, evaluation-contract version/hash, target output and dimension,
+construct, scale, units, direction, observation unit, context, and relevant
+model/parameter identities. A field may be `NOT_APPLICABLE` only with a reason.
+Sharing a numeric range such as `[0,1]` does not establish construct equivalence.
+Constant comparisons do not require candidate and baseline model identity
+equality. Ablations do require the governed model/configuration lineage and
+non-targeted configuration binding.
+
+The D11 comparator answers only whether two governed results are descriptively
+comparable. Its outcomes are `COMPARABLE`, `NOT_COMPARABLE`, and
+`NOT_EVALUABLE`, each with explicit reasons. Missing, invalid, undefined, or
+non-finite metric evidence is never converted to zero. Comparison artifacts are
+deep immutable snapshots with their own canonical hash. Multiple baselines are
+represented only by independent pairwise artifacts; order conveys no priority,
+and there is no aggregate, primary baseline, winner, ranking, score, threshold,
+pass/fail decision, or model recommendation.
+
+D11 activates no metric. D09 remains authoritative for Pearson, descriptive
+distributions, coverage/missingness, and their non-inferential interpretation.
+D10 remains `NO_THRESHOLD_DEFINED`; a baseline cannot create a threshold and a
+threshold cannot create a baseline. Phase 6.15 remains `HUMAN DATA = NONE`,
+`execution = NOT_IMPLEMENTED`, and `status = UNRESOLVED`. Human-derived
+baselines, baseline selection or optimization, registries/databases, statistical
+inference, calibration, ML training, psychometrics, and human execution remain
+outside D11.
