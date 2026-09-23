@@ -43,6 +43,13 @@
       "when": 1788915000000,
       "tag": "0005_parameter_version_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790113533365,
+      "tag": "0006_cloudy_phalanx",
+      "breakpoints": true
     }
   ]
 }

@@ -250,6 +250,10 @@ export const emotionalEvents = pgTable(
     uncertainty: doublePrecision('uncertainty'),
     context: jsonb('context').$type<JsonObject>(),
     metadata: jsonb('metadata').$type<JsonObject>(),
+    // Slice 1 duplicate protection. Nullable: internal event sources have no key.
+    idempotencyKey: text('idempotency_key'),
+    // Slice 1 canonical request digest (never the raw payload).
+    requestHash: text('request_hash'),
     createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
   },
   (table) => [
@@ -260,6 +264,9 @@ export const emotionalEvents = pgTable(
       table.projectId,
       table.id,
     ),
+    uniqueIndex('emotional_events_idempotency_key_unique')
+      .on(table.projectId, table.profileId, table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} IS NOT NULL`),
     foreignKey({
       columns: [table.projectId, table.profileId],
       foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
@@ -306,6 +313,8 @@ export const emotionalStates = pgTable(
     modelVersionId: uuid('model_version_id')
       .notNull()
       .references(() => modelVersions.id),
+    // Slice 1: the event that produced this state (null for legacy rows).
+    eventId: uuid('event_id'),
     createdAt: timestampWithTimezone('created_at').defaultNow().notNull(),
   },
   (table) => [
@@ -316,6 +325,11 @@ export const emotionalStates = pgTable(
       columns: [table.projectId, table.profileId],
       foreignColumns: [emotionalProfiles.projectId, emotionalProfiles.id],
       name: 'emotional_states_project_profile_fk',
+    }),
+    foreignKey({
+      columns: [table.projectId, table.eventId],
+      foreignColumns: [emotionalEvents.projectId, emotionalEvents.id],
+      name: 'emotional_states_project_event_fk',
     }),
   ],
 );
