@@ -1,6 +1,7 @@
 import { requireAuth } from '@emora/auth';
 import { headers } from 'next/headers';
 
+import { LatestStatePanel } from '../latest-state-panel';
 import { LogoutButton } from '../logout-button';
 import { TransitionForm } from '../transition-form';
 import {
@@ -37,6 +38,10 @@ export default async function ProtectedAppPage() {
           <p>
             Project {workspace.projectId} · profile {workspace.profileId}
           </p>
+          <LatestStatePanel
+            projectId={workspace.projectId}
+            profileId={workspace.profileId}
+          />
           <TransitionForm
             projectId={workspace.projectId}
             profileId={workspace.profileId}
