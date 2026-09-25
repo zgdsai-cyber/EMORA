@@ -18,3 +18,14 @@ The middleware provides an early redirect for missing session cookies, but prote
 ## Audit and secrets
 
 `recordAuditEvent` writes security events to the existing `audit_logs` table after validating UUIDs and metadata with Zod. Audit metadata must not contain passwords, session secrets, tokens, API keys, or sensitive emotional content. Secrets belong only in environment configuration; they are not logged or sent to client components.
+
+## Read Audit Semantics
+
+For the Slice 2 latest-state read (`GET /api/v1/projects/[projectId]/profiles/[profileId]/states/latest`):
+
+- Failed or unauthorized reads (`401`, `403`, `404`) create no durable `audit_logs` row. Structured operational logging may still occur.
+- The `404` response remains indistinguishable from "no state exists" and introduces no existence oracle.
+- A successful `200` read writes exactly one `emotional_state.read` audit row, with the existing safe metadata allow-list (operational identifiers only).
+- If that audit row cannot be written, the read fails closed: the response is `500` inside the existing safe error envelope, never an unaudited `200`.
+
+The authoritative decision record, including provenance and superseded alternatives, is `docs/decisions/read-audit-semantics.md`.

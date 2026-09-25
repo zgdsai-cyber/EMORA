@@ -68,9 +68,12 @@ is a read: it never writes product state and never mutates history.
 - **Audit:** every successful 200 read writes exactly one `audit_logs` row with
   action `emotional_state.read` whose metadata is limited to operational
   identifiers (`projectId`, `profileId`, `stateId`, `requestId`, `outcome`).
-  No emotion values, dimensions, confidence, raw JSONB, context, memories,
-  embeddings, payloads, or secrets are recorded. Failed requests (401, 403,
-  404, 500) create no audit rows and use structured operational logging only.
+  If that audit row cannot be written, the read fails closed with
+  `internal_error` (500) instead of returning an unaudited 200 — see
+  `docs/decisions/read-audit-semantics.md`. No emotion values, dimensions,
+  confidence, raw JSONB, context, memories, embeddings, payloads, or secrets are
+  recorded. Failed requests (401, 403, 404, 500) create no audit rows and use
+  structured operational logging only.
 
 ## Response fields that are never exposed
 
