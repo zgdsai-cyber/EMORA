@@ -24,6 +24,73 @@ minimumRole)` against `organization_members` joined through the project's
 
 ## Endpoints
 
+### GET /api/v1/projects
+
+Lists the projects the authenticated user may use. Scope is server-derived
+from `organization_members` joined through each project's `organization_id`;
+a browser-supplied organization is never trusted.
+
+- **Authorization:** authenticated session; `VIEWER` or above (any membership).
+- **Success (200):** `requestId`, `projects` — array of `projectId`, `name`,
+  `slug`, `createdAt`, ordered by `createdAt ASC, id ASC`. Complete list; no
+  pagination.
+- **Empty result:** `200` with `"projects": []`.
+- **Errors:** `unauthenticated` (401), `internal_error` (500).
+
+### GET /api/v1/projects/[projectId]/profiles
+
+Lists the profiles of exactly one project.
+
+- **Authorization:** `VIEWER` minimum via `requireProjectAccess`. A project the
+  caller may not access — including one that does not exist — is
+  indistinguishable from unauthorized (`forbidden`, 403; no existence oracle).
+  The query is constrained to the `(projectId)` scope, so a profile of another
+  project is never returned.
+- **Success (200):** `requestId`, `profiles` — array of `profileId`,
+  `externalReference`, `createdAt`, ordered by `createdAt ASC, id ASC`.
+  Complete list; no pagination.
+- **Empty result:** `200` with `"profiles": []`.
+- **Errors:** `invalid_input` (400), `unauthenticated` (401), `forbidden` (403),
+  `internal_error` (500).
+
+### POST /api/v1/projects/[projectId]/profiles
+
+Creates one immutable profile record (no update or delete exists).
+
+- **Authorization:** `MEMBER` minimum, server-side only.
+- **Headers:** `content-type: application/json` (non-JSON → 400
+  `invalid_content_type`).
+- **Body (strict; unknown fields rejected at the top level and inside
+  `personalityProfile`):** `externalReference` (1–128 printable ASCII,
+  unique within the project), `personalityProfile` with exactly the six
+  model-configuration inputs `emotionalSensitivity`, `baselineTrust`,
+  `baselineAnxiety`, `attachmentSensitivity`, `nostalgiaSensitivity`,
+  `jealousySensitivity` (each a finite number in [0,1]), and optional
+  `additionalTraits` (≤32 keys of 1–64 characters with finite [0,1] number
+  values; stored metadata only — never consumed by the deterministic
+  dynamics). Malformed JSON or any invalid value → 400 `invalid_input` with no
+  profile persistence and no audit row.
+- **Scientific profile-input disclosure:** profile parameters are model
+  configuration values supplied by the client. They are not a psychological
+  assessment, personality measurement, diagnosis, or clinical assessment of
+  any person, and EMORA does not validate them against real-world
+  psychological state.
+- **Success (201):** `requestId`, `projectId`, `profileId`, `externalReference`,
+  `createdAt`. No profile parameters are echoed.
+- **Duplicate behavior:** a second profile with the same `externalReference` in
+  the same project returns `external_reference_conflict` (409) with a fixed
+  safe message; the same `externalReference` in a different project is
+  accepted. There is no idempotent-create behavior and no `Idempotency-Key`.
+- **Audit:** a successful creation writes exactly one `audit_logs` row (action
+  `emotional_profile.created`) in the same transaction as the profile insert,
+  with metadata limited to `projectId`, `profileId`, `requestId`, `outcome`. If
+  that audit row cannot be written, the transaction rolls back and the request
+  fails with `internal_error` (500) — never an unaudited creation. Duplicate
+  attempts and failed requests create no audit rows.
+- **Errors:** `invalid_input` (400), `invalid_content_type` (400),
+  `unauthenticated` (401), `forbidden` (403), `external_reference_conflict`
+  (409), `internal_error` (500).
+
 ### POST /api/v1/projects/[projectId]/profiles/[profileId]/transitions
 
 Runs one deterministic emotional transition for the profile and persists the
@@ -77,14 +144,15 @@ is a read: it never writes product state and never mutates history.
 
 ## Response fields that are never exposed
 
-Neither endpoint returns `confidence`, `confidenceAdjustment`, raw persisted
+No endpoint returns `confidence`, `confidenceAdjustment`, raw persisted
 JSONB or its `metadata`, raw `context`, memories, embeddings, internal
 diagnostic payloads, or any field named or functioning as a dominant emotion,
 ranking, winner, threshold, composite score, or superiority/comparison measure.
 
 ## Scientific disclosure
 
-Both endpoints return `disclosure` (code) and `disclosureText` from the single
+The transition and latest-state endpoints return `disclosure` (code) and
+`disclosureText` from the single
 frozen constant `SCIENTIFIC_DISCLOSURE_TEXT`, which is byte-identical in the
 API and the UI. The wording is:
 
@@ -105,16 +173,17 @@ and human behavioral evaluation remain separate.
 
 ## Out of scope (deliberately not implemented)
 
-- History listing, pagination, cursors, aggregation, comparison, or
-  multi-profile sorting.
+- State-history listing, pagination, cursors, aggregation, comparison, or
+  metric-based multi-profile sorting.
 - Ranking, dominant emotion, thresholds, composite scores, or any
   superiority/comparison metric.
 - ML runtime, hybrid fusion, learned parameters, memory retrieval, RAG,
   embeddings, or vector search.
 - API-key issuance or programmatic third-party access (the `api_keys` table is
   schema foundation only).
-- Parameter-version HTTP surface, profile/project/organization CRUD, webhooks,
-  rate limiting, and evaluation-runtime coupling.
+- Parameter-version HTTP surface, profile update/deletion, project and
+  organization administration (create/update/delete), webhooks, rate limiting,
+  and evaluation-runtime coupling.
 
 See `docs/security.md` for the authorization model, `docs/privacy.md` for data
 handling boundaries, and `docs/evaluation.md` for the evaluation boundary.
